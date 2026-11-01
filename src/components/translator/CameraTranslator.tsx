@@ -1,11 +1,24 @@
 import { useEffect, useRef, useState } from "react"
 import { Camera, Volume2, Sparkles, AlertCircle, RefreshCw, Layers, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import ThreeAvatar from "@/components/avatar/ThreeAvatar"
+import type { SignGesture } from "@/components/avatar/ThreeAvatar"
 import { INDIC_LANGUAGES, speakText } from "@/lib/speech"
 
 interface CameraTranslatorProps {
   selectedLanguage: string
   onSignRecognized?: (sign: string, translation: string) => void
+}
+
+const AVATAR_GESTURE_MAP: Record<string, SignGesture> = {
+  DIGIT_4: "NUMBER_4",
+  DIGIT_5: "NUMBER_5",
+  DIGIT_1: "NUMBER_1",
+  DIGIT_2: "NUMBER_2",
+  DIGIT_3: "NUMBER_3",
+  LETTER_A: "LETTER_A",
+  NAMASTE: "NAMASTE",
+  OK_SIGN: "NUMBER_0",
 }
 
 export interface GestureResult {
@@ -211,6 +224,7 @@ export default function CameraTranslator({
   const [autoSpeak, setAutoSpeak] = useState(true)
   const [landmarkMode, setLandmarkMode] = useState<"holistic" | "skeleton">("holistic")
   const [detectedFingers, setDetectedFingers] = useState<number>(4)
+  const [showAvatarMirror, setShowAvatarMirror] = useState<boolean>(true)
 
   const lastSpokenRef = useRef<string>("")
   const frameCountRef = useRef(0)
@@ -528,7 +542,7 @@ export default function CameraTranslator({
 
       {/* Right Column: Live Recognition & Voice Engine */}
       <div className="lg:col-span-5 flex flex-col gap-4">
-        <div className="p-6 rounded-2xl bg-card border border-border shadow-xl flex flex-col gap-5">
+        <div className="p-6 rounded-2xl bg-card border border-border shadow-xl flex flex-col gap-4">
           <div className="flex items-center justify-between border-b border-border pb-3">
             <div className="flex items-center gap-2">
               <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-ping" />
@@ -536,9 +550,21 @@ export default function CameraTranslator({
                 AI Vision Detection
               </span>
             </div>
-            <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-              {(activeGesture.confidence * 100).toFixed(1)}% Confidence
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowAvatarMirror(!showAvatarMirror)}
+                className={`text-[11px] font-semibold px-2 py-0.5 rounded border transition-all ${
+                  showAvatarMirror
+                    ? "bg-cyan-950 text-cyan-400 border-cyan-800"
+                    : "bg-muted text-muted-foreground border-border"
+                }`}
+              >
+                {showAvatarMirror ? "3D Mirror: ON" : "3D Mirror: OFF"}
+              </button>
+              <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                {(activeGesture.confidence * 100).toFixed(1)}% Confidence
+              </span>
+            </div>
           </div>
 
           {/* Recognized Sign Title */}
@@ -551,6 +577,26 @@ export default function CameraTranslator({
               {activeGesture.description}
             </p>
           </div>
+
+          {/* Mirrored 3D Avatar Rendering */}
+          {showAvatarMirror && (
+            <div className="rounded-xl border border-border bg-slate-950 p-2 overflow-hidden shadow-inner flex flex-col gap-1.5">
+              <div className="flex items-center justify-between text-[11px] px-1 text-slate-400">
+                <span className="font-semibold text-cyan-400 flex items-center gap-1">
+                  <Layers className="h-3 w-3" /> Live 3D Avatar Posture Mirror:
+                </span>
+                <span className="font-mono text-emerald-400 text-[10px]">
+                  {AVATAR_GESTURE_MAP[activeGesture.id] || "NUMBER_4"}
+                </span>
+              </div>
+              <div className="h-44 w-full rounded-lg overflow-hidden">
+                <ThreeAvatar
+                  activeGesture={AVATAR_GESTURE_MAP[activeGesture.id] || "NUMBER_4"}
+                  showControls={false}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Spoken Translation in Target Language */}
           <div className="p-4 rounded-xl bg-muted/70 border border-border flex flex-col gap-1.5">

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Sparkles, Play, Volume2, Copy, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import ThreeAvatar from "@/components/avatar/ThreeAvatar"
@@ -18,23 +18,151 @@ interface SignCreatorStudioProps {
   currentLanguage: string
 }
 
+function parseSentenceToTokens(text: string): SignToken[] {
+  const clean = text.trim()
+  if (!clean) {
+    return [
+      { id: "1", word: "Namaste", gloss: "NAMASTE", gesture: "NAMASTE", duration: 1.2, facialBlendshape: "gentle_smile" }
+    ]
+  }
+
+  const rawWords = clean.split(/\s+/)
+  const result: SignToken[] = []
+  let idCounter = 1
+
+  for (const raw of rawWords) {
+    const w = raw.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()
+    if (!w) continue
+
+    // Check single digits
+    if (/^[0-9]$/.test(w)) {
+      result.push({
+        id: String(idCounter++),
+        word: raw,
+        gloss: `DIGIT-${w}`,
+        gesture: `NUMBER_${w}` as SignGesture,
+        duration: 1.0,
+        facialBlendshape: "neutral"
+      })
+      continue
+    }
+
+    // Check common ISL vocabulary words
+    if (["HELLO", "HI", "NAMASTE", "MORNING", "GOOD", "PRANAM"].includes(w)) {
+      result.push({
+        id: String(idCounter++),
+        word: raw,
+        gloss: "NAMASTE",
+        gesture: "NAMASTE",
+        duration: 1.3,
+        facialBlendshape: "gentle_smile"
+      })
+    } else if (["THANK", "THANKS", "THANKYOU", "DHANYAVAD", "ABHAR"].includes(w)) {
+      result.push({
+        id: String(idCounter++),
+        word: raw,
+        gloss: "THANK-YOU",
+        gesture: "THANK_YOU",
+        duration: 1.2,
+        facialBlendshape: "grateful_smile"
+      })
+    } else if (["NAME", "WHO", "WHAT"].includes(w)) {
+      result.push({
+        id: String(idCounter++),
+        word: raw,
+        gloss: "WHAT-NAME",
+        gesture: "WHAT_IS_YOUR_NAME",
+        duration: 1.5,
+        facialBlendshape: "question_furrow"
+      })
+    } else if (["STUDENT", "COLLEGE", "SCHOOL", "STUDY", "LEARN"].includes(w)) {
+      result.push({
+        id: String(idCounter++),
+        word: raw,
+        gloss: "STUDENT",
+        gesture: "STUDENT",
+        duration: 1.2,
+        facialBlendshape: "affirmative"
+      })
+    } else if (["HELP", "ASSIST", "EMERGENCY"].includes(w)) {
+      result.push({
+        id: String(idCounter++),
+        word: raw,
+        gloss: "HELP-NEED",
+        gesture: "HELP",
+        duration: 1.4,
+        facialBlendshape: "earnest_plea"
+      })
+    } else if (["WATER", "DRINK", "PANI"].includes(w)) {
+      result.push({
+        id: String(idCounter++),
+        word: raw,
+        gloss: "WATER",
+        gesture: "WATER",
+        duration: 1.1,
+        facialBlendshape: "neutral"
+      })
+    } else if (["YES", "CORRECT", "TRUE"].includes(w)) {
+      result.push({
+        id: String(idCounter++),
+        word: raw,
+        gloss: "YES",
+        gesture: "YES",
+        duration: 1.0,
+        facialBlendshape: "smile"
+      })
+    } else if (["NO", "NOT", "FALSE"].includes(w)) {
+      result.push({
+        id: String(idCounter++),
+        word: raw,
+        gloss: "NO",
+        gesture: "NO",
+        duration: 1.0,
+        facialBlendshape: "head_shake"
+      })
+    } else {
+      // Fingerspell word character by character using ISLRTC postures
+      for (const char of w) {
+        if (/^[A-Z]$/.test(char)) {
+          result.push({
+            id: String(idCounter++),
+            word: char,
+            gloss: `FS-${char}`,
+            gesture: `LETTER_${char}` as SignGesture,
+            duration: 0.9,
+            facialBlendshape: "focused_neutral"
+          })
+        } else if (/^[0-9]$/.test(char)) {
+          result.push({
+            id: String(idCounter++),
+            word: char,
+            gloss: `DIGIT-${char}`,
+            gesture: `NUMBER_${char}` as SignGesture,
+            duration: 0.9,
+            facialBlendshape: "focused_neutral"
+          })
+        }
+      }
+    }
+  }
+
+  return result.length > 0
+    ? result
+    : [
+        { id: "1", word: "Namaste", gloss: "NAMASTE", gesture: "NAMASTE", duration: 1.2, facialBlendshape: "gentle_smile" }
+      ]
+}
+
 export default function SignCreatorStudio({ currentLanguage = "gu" }: SignCreatorStudioProps) {
-  const [inputText, setInputText] = useState("Good morning. My name is Tirth. I am a university student.")
+  const [inputText, setInputText] = useState("Hello student water 4 5")
   const [activeTokenIdx, setActiveTokenIdx] = useState<number>(0)
   const [isPlayingSequence, setIsPlayingSequence] = useState<boolean>(false)
   const [copied, setCopied] = useState<boolean>(false)
 
-  // Token breakdown
-  const tokens: SignToken[] = [
-    { id: "1", word: "Good", gloss: "GOOD", gesture: "NAMASTE", duration: 1.2, facialBlendshape: "gentle_smile" },
-    { id: "2", word: "Morning", gloss: "MORNING", gesture: "NAMASTE", duration: 1.0, facialBlendshape: "head_nod" },
-    { id: "3", word: "My Name", gloss: "NAME", gesture: "WHAT_IS_YOUR_NAME", duration: 1.5, facialBlendshape: "neutral" },
-    { id: "4", word: "Tirth", gloss: "T-I-R-T-H", gesture: "THANK_YOU", duration: 1.8, facialBlendshape: "affirmative" },
-    { id: "5", word: "I Am", gloss: "ME", gesture: "STUDENT", duration: 1.0, facialBlendshape: "self_focus" },
-    { id: "6", word: "Student", gloss: "STUDENT-PERSON", gesture: "STUDENT", duration: 1.5, facialBlendshape: "smile" },
-  ]
+  const tokens = useMemo(() => parseSentenceToTokens(inputText), [inputText])
 
-  const activeToken = tokens[activeTokenIdx] || tokens[0]
+  const safeTokenIdx = activeTokenIdx < tokens.length ? activeTokenIdx : 0
+  const activeToken = tokens[safeTokenIdx] || tokens[0]
   const activeLang = INDIC_LANGUAGES.find((l) => l.code === currentLanguage) || INDIC_LANGUAGES[0]
 
   // Play through all signs sequentially

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Camera, Volume2, CheckCircle2 } from "lucide-react"
+import { Camera, Volume2, CheckCircle2, Image as ImageIcon, X, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import ThreeAvatar from "@/components/avatar/ThreeAvatar"
 import { INDIC_LANGUAGES, speakText } from "@/lib/speech"
@@ -56,6 +56,7 @@ export default function LearningPortal({ currentLanguage = "gu" }: LearningPorta
   const [selectedNumber, setSelectedNumber] = useState("1")
   const [practiceAccuracy, setPracticeAccuracy] = useState<number | null>(null)
   const [isEvaluating, setIsEvaluating] = useState(false)
+  const [showChartModal, setShowChartModal] = useState(false)
 
   const activeAlphabet = ALPHABET_DATA[selectedLetter] || ALPHABET_DATA["A"]
   const activeNumber = NUMBER_DATA[selectedNumber] || NUMBER_DATA["1"]
@@ -141,6 +142,26 @@ export default function LearningPortal({ currentLanguage = "gu" }: LearningPorta
                 </p>
                 <div className="text-[11px] text-primary font-medium">
                   Tip: {activeAlphabet.tips}
+                </div>
+                <div className="pt-2 border-t border-border flex items-center justify-between">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowChartModal(true)}
+                    className="gap-1.5 text-xs h-8 border-dashed"
+                  >
+                    <ImageIcon className="h-3.5 w-3.5 text-cyan-500" />
+                    <span>View Official ISLRTC Alphabets Chart</span>
+                  </Button>
+                  <a
+                    href="/assets/isl_alphabets.png"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1"
+                  >
+                    <span>Full Poster</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
                 </div>
               </div>
             </div>
@@ -285,6 +306,26 @@ export default function LearningPortal({ currentLanguage = "gu" }: LearningPorta
                 <div className="text-[11px] text-muted-foreground">
                   {activeNumber.description}
                 </div>
+                <div className="pt-2 border-t border-border flex items-center justify-between">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowChartModal(true)}
+                    className="gap-1.5 text-xs h-8 border-dashed"
+                  >
+                    <ImageIcon className="h-3.5 w-3.5 text-cyan-500" />
+                    <span>View Official ISLRTC Numbers Chart</span>
+                  </Button>
+                  <a
+                    href="/assets/isl_numbers.png"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1"
+                  >
+                    <span>Full Poster</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
               </div>
             </div>
           </div>
@@ -383,6 +424,49 @@ export default function LearningPortal({ currentLanguage = "gu" }: LearningPorta
                   </span>
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ISLRTC Reference Chart Modal */}
+      {showChartModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="relative w-full max-w-4xl max-h-[90vh] bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-border bg-muted/40">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="h-5 w-5 text-primary" />
+                <h3 className="text-sm font-bold text-foreground">
+                  Official ISLRTC Government Reference Chart — {tab === "alphabets" ? "Alphabets (A–Z)" : "Numbers (0–9)"}
+                </h3>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowChartModal(false)}
+                className="h-8 w-8 p-0 rounded-full"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4 flex flex-col items-center justify-center bg-slate-950">
+              <img
+                src={tab === "alphabets" ? "/assets/isl_alphabets.png" : "/assets/isl_numbers.png"}
+                alt={`ISLRTC ${tab === "alphabets" ? "Alphabets" : "Numbers"} Reference Chart`}
+                className="max-h-[72vh] w-auto rounded-lg object-contain border border-slate-800 shadow-xl"
+              />
+            </div>
+
+            <div className="p-3 border-t border-border bg-card flex items-center justify-between text-xs text-muted-foreground">
+              <span>Standardized by Ministry of Social Justice & Empowerment, Govt. of India</span>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setShowChartModal(false)}
+              >
+                Close Reference Chart
+              </Button>
             </div>
           </div>
         </div>
