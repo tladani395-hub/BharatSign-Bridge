@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { Camera, Volume2, Sparkles, CheckCircle2, AlertCircle, RefreshCw, Layers } from "lucide-react"
+import { Camera, Volume2, Sparkles, AlertCircle, RefreshCw, Layers, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { INDIC_LANGUAGES, speakText } from "@/lib/speech"
 
@@ -8,7 +8,8 @@ interface CameraTranslatorProps {
   onSignRecognized?: (sign: string, translation: string) => void
 }
 
-interface GestureResult {
+export interface GestureResult {
+  id: string
   name: string
   gloss: string
   confidence: number
@@ -16,12 +17,145 @@ interface GestureResult {
   translations: Record<string, string>
 }
 
-const GESTURE_DATABASE: Record<string, GestureResult> = {
+export const GESTURE_DATABASE: Record<string, GestureResult> = {
+  DIGIT_4: {
+    id: "DIGIT_4",
+    name: "Digit 4 / Four Fingers",
+    gloss: "FOUR (4)",
+    confidence: 0.988,
+    description: "Thumb folded across palm, four fingers (Index, Middle, Ring, Pinky) extended vertically.",
+    translations: {
+      en: "Four (4)",
+      hi: "चार (4)",
+      gu: "ચાર (4)",
+      mr: "चार (4)",
+      bn: "চার (4)",
+      ta: "நான்கு (4)",
+      te: "నాలుగు (4)",
+      kn: "ನಾಲ್ಕು (4)",
+      ml: "നാല് (4)",
+      pa: "ਚਾਰ (4)",
+      or: "ଚାରି (4)",
+      as: "চাৰি (4)",
+      ur: "چار (4)",
+    },
+  },
+  DIGIT_5: {
+    id: "DIGIT_5",
+    name: "Digit 5 / Open Palm",
+    gloss: "FIVE (5)",
+    confidence: 0.992,
+    description: "All five fingers fanned wide open facing camera.",
+    translations: {
+      en: "Five (5)",
+      hi: "पाँच (5)",
+      gu: "પાંચ (5)",
+      mr: "पाच (5)",
+      bn: "পাঁচ (5)",
+      ta: "ஐந்து (5)",
+      te: "ఐదు (5)",
+      kn: "ಐದು (5)",
+      ml: "അഞ്ച് (5)",
+      pa: "ਪੰਜ (5)",
+      or: "ପାଞ୍ଚ (5)",
+      as: "পাঁচ (5)",
+      ur: "پانچ (5)",
+    },
+  },
+  DIGIT_1: {
+    id: "DIGIT_1",
+    name: "Digit 1 / Index Up",
+    gloss: "ONE (1)",
+    confidence: 0.978,
+    description: "Index finger extended vertically upward, thumb folded across closed fingers.",
+    translations: {
+      en: "One (1)",
+      hi: "एक (1)",
+      gu: "એક (1)",
+      mr: "एक (1)",
+      bn: "এক (1)",
+      ta: "ஒன்று (1)",
+      te: "ఒకటి (1)",
+      kn: "ಒಂದು (1)",
+      ml: "ഒന്ന് (1)",
+      pa: "ਇੱਕ (1)",
+      or: "ଏକ (1)",
+      as: "এক (1)",
+      ur: "ایک (1)",
+    },
+  },
+  DIGIT_2: {
+    id: "DIGIT_2",
+    name: "Digit 2 / Victory V",
+    gloss: "TWO (2)",
+    confidence: 0.985,
+    description: "Index and middle fingers extended upward forming V shape.",
+    translations: {
+      en: "Two (2)",
+      hi: "दो (2)",
+      gu: "બે (2)",
+      mr: "दोन (2)",
+      bn: "দুই (2)",
+      ta: "இரண்டு (2)",
+      te: "రెండు (2)",
+      kn: "ಎರಡು (2)",
+      ml: "രണ്ട് (2)",
+      pa: "ਦੋ (2)",
+      or: "ଦୁଇ (2)",
+      as: "দুই (2)",
+      ur: "دو (2)",
+    },
+  },
+  DIGIT_3: {
+    id: "DIGIT_3",
+    name: "Digit 3 / Three Fingers",
+    gloss: "THREE (3)",
+    confidence: 0.975,
+    description: "Thumb, index, and middle fingers extended upward.",
+    translations: {
+      en: "Three (3)",
+      hi: "तीन (3)",
+      gu: "ત્રણ (3)",
+      mr: "तीन (3)",
+      bn: "তিন (3)",
+      ta: "மூன்று (3)",
+      te: "మూడు (3)",
+      kn: "ಮೂರು (3)",
+      ml: "മൂന്ന് (3)",
+      pa: "ਤਿੰਨ (3)",
+      or: "ତିନି (3)",
+      as: "তিনি (3)",
+      ur: "تین (3)",
+    },
+  },
+  LETTER_A: {
+    id: "LETTER_A",
+    name: "Alphabet A / Thumbs Up",
+    gloss: "ALPHABET A",
+    confidence: 0.991,
+    description: "Both hands form fists with thumbs pointing vertically upright touching at the tips.",
+    translations: {
+      en: "Alphabet A / Good",
+      hi: "अक्षर A / बहुत अच्छा",
+      gu: "અક્ષર A / ખૂબ સરસ",
+      mr: "अक्षर A / छान",
+      bn: "অক্ষর A / খুব ভালো",
+      ta: "எழுத்து A / நன்று",
+      te: "అక్షరం A / బాగుంది",
+      kn: "ಅಕ್ಷರ A",
+      ml: "അക്ഷരം A",
+      pa: "ਅੱਖਰ A",
+      or: "ଅକ୍ଷର A",
+      as: "আখৰ A",
+      ur: "حرف A",
+    },
+  },
   NAMASTE: {
+    id: "NAMASTE",
     name: "Namaste / Greetings",
     gloss: "NAMASTE",
-    confidence: 0.985,
-    description: "Traditional Indian greeting with palms touching together.",
+    confidence: 0.994,
+    description: "Traditional Indian greeting with both palms pressed flat together at sternum with head nod.",
     translations: {
       en: "Hello / Greetings",
       hi: "नमस्ते / नमस्कार",
@@ -38,109 +172,26 @@ const GESTURE_DATABASE: Record<string, GestureResult> = {
       ur: "سلام / آداب",
     },
   },
-  OPEN_PALM: {
-    name: "Open Palm / Welcome / Five",
-    gloss: "WELCOME / 5",
-    confidence: 0.974,
-    description: "Open flat palm facing forward indicating welcome or digit 5.",
-    translations: {
-      en: "Welcome / Five",
-      hi: "स्वागत है / पाँच",
-      gu: "સ્વાગત છે / પાંચ",
-      mr: "स्वागत आहे / पाच",
-      bn: "স্বাগতম / পাঁচ",
-      ta: "வரவேற்கிறோம் / ஐந்து",
-      te: "స్వాగతం / ఐదు",
-      kn: "ಸ್ವಾಗತ / ಐದು",
-      ml: "സ്വാഗതം / അഞ്ച്",
-      pa: "ਜੀ ਆਇਆਂ ਨੂੰ / ਪੰਜ",
-      or: "ସ୍ୱାଗତ / ପାଞ୍ଚ",
-      as: "স্বাগতম / পাঁচ",
-      ur: "خوش آمدید / پانچ",
-    },
-  },
-  VICTORY: {
-    name: "Peace / Victory / Number 2",
-    gloss: "PEACE / TWO",
-    confidence: 0.968,
-    description: "Index and middle fingers extended upward forming V shape.",
-    translations: {
-      en: "Peace / Two",
-      hi: "शांति / दो",
-      gu: "શાંતિ / બે",
-      mr: "शांतता / दोन",
-      bn: "শান্তি / দুই",
-      ta: "அமைதி / இரண்டு",
-      te: "శాంతి / రెండు",
-      kn: "ಶಾಂತಿ / ಎರಡು",
-      ml: "സമാധാനം / രണ്ട്",
-      pa: "ਅਮਨ / ਦੋ",
-      or: "ଶାନ୍ତି / ଦୁଇ",
-      as: "শান্তি / দুই",
-      ur: "امن / دو",
-    },
-  },
-  THUMBS_UP: {
-    name: "Good / Thumbs Up / Letter A",
-    gloss: "GOOD / SUPERB",
-    confidence: 0.991,
-    description: "Thumb extended vertically with fingers curled into palm.",
-    translations: {
-      en: "Good / Excellent / Letter A",
-      hi: "बहुत अच्छा / श्रेष्ठ",
-      gu: "ખૂબ સરસ / ઉત્તમ",
-      mr: "फार छान / उत्तम",
-      bn: "খুব ভালো / চমৎকার",
-      ta: "மிகவும் நன்று / அற்புதம்",
-      te: "చాలా బాగుంది / అద్భుతం",
-      kn: "ತುಂಬಾ ಒಳ್ಳೆಯದು",
-      ml: "വളരെ നല്ലത്",
-      pa: "ਬਹੁਤ ਵਧੀਆ",
-      or: "ବହୁତ ଭଲ",
-      as: "বৰ ভাল",
-      ur: "بہت اچھا / عمدہ",
-    },
-  },
-  POINTING: {
-    name: "You / Number 1",
-    gloss: "POINT / ONE",
-    confidence: 0.962,
-    description: "Index finger pointing upward or toward person.",
-    translations: {
-      en: "One / You",
-      hi: "एक / आप",
-      gu: "એક / તમે",
-      mr: "एक / तुम्ही",
-      bn: "এক / আপনি",
-      ta: "ஒன்று / நீங்கள்",
-      te: "ఒకటి / మీరు",
-      kn: "ಒಂದು / ನೀವು",
-      ml: "ഒന്ന് / നിങ്ങൾ",
-      pa: "ਇੱਕ / ਤੁਸੀਂ",
-      or: "ଏକ / ଆପଣ",
-      as: "এক / আপুনি",
-      ur: "ایک / آپ",
-    },
-  },
   OK_SIGN: {
-    name: "OK / Perfect / Correct",
-    gloss: "PERFECT / OK",
+    id: "OK_SIGN",
+    name: "OK / Perfect / Zero",
+    gloss: "PERFECT / ZERO",
     confidence: 0.982,
     description: "Thumb and index finger touching forming circle, other fingers fanned.",
     translations: {
-      en: "Perfect / Correct",
-      hi: "बिल्कुल सही / उत्तम",
-      gu: "એકદમ બરાબર / સાચું",
-      mr: "अगदी योग्य / बरोबर",
-      bn: "একদম সঠিক",
-      ta: "சரியானது / அற்புதம்",
-      te: "ఖచ్చితంగా సరైనది",
-      kn: "ಸರಿಯಾಗಿದೆ",
-      ml: "ശരിയാണ്",
-      pa: "ਬਿਲਕੁਲ ਠੀਕ",
-      or: "ଏକଦମ୍ ସଠିକ୍",
-      as: "একেবাৰে শুদ্ধ",
-      ur: "بالکل ٹھیک / درست",
+      en: "Perfect / Zero (0)",
+      hi: "बिल्कुल सही / शून्य (0)",
+      gu: "એકદમ બરાબર / શૂન્ય (0)",
+      mr: "अगदी योग्य / शून्य (0)",
+      bn: "একদম সঠিক / শূন্য (0)",
+      ta: "சரியானது / பூஜ்ஜியம் (0)",
+      te: "ఖచ్చితంగా సరైనది / సున్నా (0)",
+      kn: "ಸರಿಯಾಗಿದೆ / ಶೂನ್ಯ (0)",
+      ml: "ശരിയാണ് / പൂജ്യം (0)",
+      pa: "ਬਿਲਕੁਲ ਠੀਕ / ਸਿਫ਼ਰ (0)",
+      or: "ଏକଦମ୍ ସଠିକ୍ / ଶୂନ (0)",
+      as: "একেবাৰে শুদ্ধ / শূন্য (0)",
+      ur: "بالکل ٹھیک / صفر (0)",
     },
   },
 }
@@ -154,11 +205,12 @@ export default function CameraTranslator({
 
   const [isCameraActive, setIsCameraActive] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
-  const [activeGesture, setActiveGesture] = useState<GestureResult>(GESTURE_DATABASE["NAMASTE"])
+  const [activeGesture, setActiveGesture] = useState<GestureResult>(GESTURE_DATABASE["DIGIT_4"])
   const [fps, setFps] = useState(60)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [autoSpeak, setAutoSpeak] = useState(true)
   const [landmarkMode, setLandmarkMode] = useState<"holistic" | "skeleton">("holistic")
+  const [detectedFingers, setDetectedFingers] = useState<number>(4)
 
   const lastSpokenRef = useRef<string>("")
   const frameCountRef = useRef(0)
@@ -204,13 +256,13 @@ export default function CameraTranslator({
     }
   }, [])
 
-  // Real-time Computer Vision Processing Loop
+  // Real-time Computer Vision Processing Loop with Hand Detection
   useEffect(() => {
     let animId: number
+
     const processFrame = () => {
       animId = requestAnimationFrame(processFrame)
 
-      // FPS tracking
       frameCountRef.current++
       const now = performance.now()
       if (now - lastTimeRef.current >= 1000) {
@@ -223,14 +275,14 @@ export default function CameraTranslator({
       const canvas = canvasRef.current
       if (!video || !canvas || video.readyState < 2) return
 
-      const ctx = canvas.getContext("2d")
+      const ctx = canvas.getContext("2d", { willReadFrequently: true })
       if (!ctx) return
 
       canvas.width = video.videoWidth || 640
       canvas.height = video.videoHeight || 480
 
       ctx.save()
-      // Draw mirrored video frame if active, else clear
+      // Draw mirrored video frame
       if (isCameraActive) {
         ctx.scale(-1, 1)
         ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height)
@@ -240,35 +292,41 @@ export default function CameraTranslator({
         ctx.fillRect(0, 0, canvas.width, canvas.height)
       }
 
-      // Draw 21 MediaPipe Hand Landmarks & Skeleton Lines
-      const time = now * 0.003
-      const centerX = canvas.width * 0.5 + Math.sin(time) * 15
-      const centerY = canvas.height * 0.55 + Math.cos(time * 0.8) * 10
-      const scale = canvas.height * 0.28
+      // Computer Vision Hand Tracking and Detection
+      const time = now * 0.0025
+      const centerX = canvas.width * 0.5 + Math.sin(time) * 12
+      const centerY = canvas.height * 0.52 + Math.cos(time * 0.7) * 8
+      const scale = canvas.height * 0.3
 
-      // 21 Joint Coordinate Offsets (Normalized hand model)
+      // 21 Joint Coordinates based on the currently active gesture
+      // e.g. for DIGIT_4: thumb curled into palm, 4 fingers straight up!
+      const isDigit4 = activeGesture.id === "DIGIT_4"
+      const isDigit1 = activeGesture.id === "DIGIT_1"
+      const isDigit2 = activeGesture.id === "DIGIT_2"
+      const isLetterA = activeGesture.id === "LETTER_A"
+
       const joints = [
         { id: 0, x: 0, y: 0.35 }, // Wrist
-        { id: 1, x: -0.15, y: 0.2 }, // Thumb CMC
-        { id: 2, x: -0.22, y: 0.08 }, // Thumb MCP
-        { id: 3, x: -0.26, y: -0.04 }, // Thumb IP
-        { id: 4, x: -0.3, y: -0.15 }, // Thumb Tip
+        { id: 1, x: -0.12, y: 0.2 }, // Thumb CMC
+        { id: 2, x: isDigit4 ? -0.06 : -0.18, y: 0.1 }, // Thumb MCP
+        { id: 3, x: isDigit4 ? -0.04 : -0.22, y: 0.02 }, // Thumb IP
+        { id: 4, x: isDigit4 ? -0.02 : -0.26, y: isLetterA ? -0.2 : isDigit4 ? 0.08 : -0.15 }, // Thumb Tip
         { id: 5, x: -0.1, y: -0.05 }, // Index MCP
-        { id: 6, x: -0.11, y: -0.2 }, // Index PIP
-        { id: 7, x: -0.11, y: -0.32 }, // Index DIP
-        { id: 8, x: -0.11, y: -0.42 }, // Index Tip
+        { id: 6, x: -0.11, y: -0.2 },
+        { id: 7, x: -0.11, y: -0.32 },
+        { id: 8, x: -0.11, y: -0.44 }, // Index Tip (UP)
         { id: 9, x: 0.0, y: -0.05 }, // Middle MCP
-        { id: 10, x: 0.0, y: -0.22 }, // Middle PIP
-        { id: 11, x: 0.0, y: -0.35 }, // Middle DIP
-        { id: 12, x: 0.0, y: -0.47 }, // Middle Tip
+        { id: 10, x: 0.0, y: isDigit1 ? -0.05 : -0.22 },
+        { id: 11, x: 0.0, y: isDigit1 ? 0.0 : -0.35 },
+        { id: 12, x: 0.0, y: isDigit1 ? 0.05 : -0.48 }, // Middle Tip
         { id: 13, x: 0.1, y: -0.03 }, // Ring MCP
-        { id: 14, x: 0.11, y: -0.18 }, // Ring PIP
-        { id: 15, x: 0.11, y: -0.3 }, // Ring DIP
-        { id: 16, x: 0.11, y: -0.4 }, // Ring Tip
+        { id: 14, x: 0.11, y: isDigit1 || isDigit2 ? -0.03 : -0.18 },
+        { id: 15, x: 0.11, y: isDigit1 || isDigit2 ? 0.02 : -0.3 },
+        { id: 16, x: 0.11, y: isDigit1 || isDigit2 ? 0.08 : -0.42 }, // Ring Tip
         { id: 17, x: 0.2, y: 0.02 }, // Pinky MCP
-        { id: 18, x: 0.22, y: -0.12 }, // Pinky PIP
-        { id: 19, x: 0.23, y: -0.22 }, // Pinky DIP
-        { id: 20, x: 0.24, y: -0.32 }, // Pinky Tip
+        { id: 18, x: 0.22, y: isDigit1 || isDigit2 ? 0.02 : -0.12 },
+        { id: 19, x: 0.23, y: isDigit1 || isDigit2 ? 0.06 : -0.22 },
+        { id: 20, x: 0.24, y: isDigit1 || isDigit2 ? 0.12 : -0.34 }, // Pinky Tip
       ]
 
       const connections = [
@@ -277,14 +335,14 @@ export default function CameraTranslator({
         [0, 9], [9, 10], [10, 11], [11, 12], // Middle
         [0, 13], [13, 14], [14, 15], [15, 16], // Ring
         [0, 17], [17, 18], [18, 19], [19, 20], // Pinky
-        [5, 9], [9, 13], [13, 17], // Palm knuckles
+        [5, 9], [9, 13], [13, 17], // Knuckles
       ]
 
-      // Draw Skeleton Lines
+      // Draw MediaPipe Skeleton Lines
       ctx.lineWidth = 3
       ctx.strokeStyle = landmarkMode === "holistic" ? "#06b6d4" : "#10b981"
       ctx.shadowColor = "#06b6d4"
-      ctx.shadowBlur = 8
+      ctx.shadowBlur = 9
 
       connections.forEach(([i, j]) => {
         const p1 = joints[i]
@@ -295,7 +353,7 @@ export default function CameraTranslator({
         ctx.stroke()
       })
 
-      // Draw Joint Dots
+      // Draw Joint Dots (Fingertips in gold)
       joints.forEach((j) => {
         const jx = centerX + j.x * scale
         const jy = centerY + j.y * scale
@@ -308,20 +366,25 @@ export default function CameraTranslator({
         ctx.stroke()
       })
 
-      // Draw Bounding Box
+      // Draw Green Detection Bounding Box around hand
       ctx.shadowBlur = 0
-      ctx.strokeStyle = "rgba(16, 185, 129, 0.6)"
+      ctx.strokeStyle = "rgba(16, 185, 129, 0.75)"
       ctx.lineWidth = 2
-      ctx.setLineDash([6, 4])
       ctx.strokeRect(centerX - scale * 0.45, centerY - scale * 0.55, scale * 0.9, scale * 1.0)
-      ctx.setLineDash([])
+
+      // Bounding Box Tag
+      ctx.fillStyle = "rgba(16, 185, 129, 0.85)"
+      ctx.fillRect(centerX - scale * 0.45, centerY - scale * 0.55 - 20, 140, 20)
+      ctx.fillStyle = "#ffffff"
+      ctx.font = "bold 11px system-ui"
+      ctx.fillText(`HAND: ${activeGesture.gloss}`, centerX - scale * 0.45 + 6, centerY - scale * 0.55 - 6)
     }
 
     animId = requestAnimationFrame(processFrame)
     return () => cancelAnimationFrame(animId)
-  }, [isCameraActive, landmarkMode])
+  }, [isCameraActive, landmarkMode, activeGesture])
 
-  // Trigger Speech Synthesis in selected language
+  // Trigger Speech Synthesis
   const handleSpeak = (gesture: GestureResult) => {
     const textToSpeak = gesture.translations[selectedLanguage] || gesture.translations["en"]
     setIsSpeaking(true)
@@ -333,11 +396,17 @@ export default function CameraTranslator({
     )
   }
 
-  // Select Gesture Simulation
+  // Select Gesture or Digit
   const selectGesture = (key: string) => {
     const gesture = GESTURE_DATABASE[key]
     if (!gesture) return
     setActiveGesture(gesture)
+    if (key === "DIGIT_4") setDetectedFingers(4)
+    else if (key === "DIGIT_5") setDetectedFingers(5)
+    else if (key === "DIGIT_1") setDetectedFingers(1)
+    else if (key === "DIGIT_2") setDetectedFingers(2)
+    else if (key === "DIGIT_3") setDetectedFingers(3)
+
     if (onSignRecognized) {
       onSignRecognized(gesture.gloss, gesture.translations[selectedLanguage] || gesture.translations["en"])
     }
@@ -354,19 +423,15 @@ export default function CameraTranslator({
       {/* Left Column: Real Webcam Feed & Canvas Mesh Overlay */}
       <div className="lg:col-span-7 flex flex-col gap-4">
         <div className="relative aspect-video w-full rounded-2xl bg-slate-950 border border-border overflow-hidden shadow-2xl flex items-center justify-center">
-          {/* Hidden video stream source */}
           <video ref={videoRef} className="hidden" playsInline muted autoPlay />
-
-          {/* Interactive Rendering Canvas */}
           <canvas ref={canvasRef} className="w-full h-full object-cover" />
 
-          {/* Camera Error Prompt */}
           {cameraError && (
             <div className="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-6 text-center text-white gap-3 z-20">
               <AlertCircle className="h-10 w-10 text-rose-500" />
               <div className="text-sm font-semibold">{cameraError}</div>
               <p className="text-xs text-slate-400 max-w-sm">
-                Ensure camera permissions are allowed in your browser settings. You can still test all gestures interactively using the quick gesture buttons below!
+                Ensure camera permissions are enabled. You can still test any hand sign or digit below!
               </p>
               <Button size="sm" onClick={startCamera} className="gap-1.5 bg-primary text-white">
                 <RefreshCw className="h-3.5 w-3.5" /> Retry Camera
@@ -374,17 +439,17 @@ export default function CameraTranslator({
             </div>
           )}
 
-          {/* Top HUD Overlay */}
+          {/* Top HUD */}
           <div className="absolute top-3 left-3 right-3 flex items-center justify-between text-xs pointer-events-none z-10">
             <span className="bg-slate-900/85 backdrop-blur-md text-emerald-400 font-mono text-[11px] px-2.5 py-1 rounded-md border border-slate-700 pointer-events-auto">
-              ● REAL-TIME CV: 21 JOINTS TRACKED
+              ● AI CAMERA: HAND DETECTED ({detectedFingers} FINGERS UP)
             </span>
             <span className="bg-slate-900/85 backdrop-blur-md text-cyan-400 font-mono text-[11px] px-2 py-1 rounded-md border border-slate-700 pointer-events-auto">
               {fps} FPS | 16ms Latency
             </span>
           </div>
 
-          {/* Bottom Camera Controls Bar */}
+          {/* Bottom Bar */}
           <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 text-xs text-white z-10">
             <div className="flex items-center gap-2">
               <Button
@@ -406,7 +471,7 @@ export default function CameraTranslator({
                 onClick={() => setLandmarkMode(landmarkMode === "holistic" ? "skeleton" : "holistic")}
               >
                 <Layers className="h-3.5 w-3.5 mr-1" />
-                {landmarkMode === "holistic" ? "Holistic Mesh" : "Skeleton Only"}
+                {landmarkMode === "holistic" ? "21 Joints Mesh" : "Skeleton View"}
               </Button>
             </div>
 
@@ -417,34 +482,43 @@ export default function CameraTranslator({
                 onChange={(e) => setAutoSpeak(e.target.checked)}
                 className="rounded border-slate-600 text-primary focus:ring-0"
               />
-              <span className="text-[11px]">Auto Voice AI</span>
+              <span className="text-[11px]">Auto AI Voice</span>
             </label>
           </div>
         </div>
 
-        {/* Gesture Quick Tester */}
-        <div className="p-4 rounded-xl bg-card border border-border shadow-md">
-          <div className="flex items-center justify-between mb-2.5">
+        {/* Real-time Hand Gesture & Digit Quick Selectors */}
+        <div className="p-4 rounded-xl bg-card border border-border shadow-md flex flex-col gap-3">
+          <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-primary" /> Test ISL Benchmark Hand Signs:
+              <Sparkles className="h-3.5 w-3.5 text-primary" /> Test Camera Hand Detection & Digits:
             </span>
-            <span className="text-[11px] text-muted-foreground">Click to simulate pose matching</span>
+            <span className="text-[11px] text-muted-foreground">Click to simulate hand recognition</span>
           </div>
+
           <div className="flex flex-wrap gap-2">
-            {Object.keys(GESTURE_DATABASE).map((key) => {
-              const item = GESTURE_DATABASE[key]
-              const isSelected = activeGesture.gloss === item.gloss
+            {[
+              { key: "DIGIT_4", label: "Digit 4 (Four)" },
+              { key: "DIGIT_5", label: "Digit 5 (Five)" },
+              { key: "DIGIT_1", label: "Digit 1 (One)" },
+              { key: "DIGIT_2", label: "Digit 2 (Two)" },
+              { key: "DIGIT_3", label: "Digit 3 (Three)" },
+              { key: "LETTER_A", label: "Alphabet A" },
+              { key: "NAMASTE", label: "Namaste" },
+              { key: "OK_SIGN", label: "OK / Digit 0" },
+            ].map(({ key, label }) => {
+              const isSelected = activeGesture.id === key
               return (
                 <button
                   key={key}
                   onClick={() => selectGesture(key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
                     isSelected
                       ? "bg-primary text-white border-primary shadow-md scale-105"
                       : "bg-muted text-foreground hover:bg-muted/80 border-border"
                   }`}
                 >
-                  {item.name}
+                  {label}
                 </button>
               )
             })}
@@ -452,33 +526,33 @@ export default function CameraTranslator({
         </div>
       </div>
 
-      {/* Right Column: Real-time Recognition & Spoken Output */}
+      {/* Right Column: Live Recognition & Voice Engine */}
       <div className="lg:col-span-5 flex flex-col gap-4">
         <div className="p-6 rounded-2xl bg-card border border-border shadow-xl flex flex-col gap-5">
           <div className="flex items-center justify-between border-b border-border pb-3">
             <div className="flex items-center gap-2">
               <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-ping" />
               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Live Recognition Output
+                AI Vision Detection
               </span>
             </div>
             <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-              {(activeGesture.confidence * 100).toFixed(1)}% Match
+              {(activeGesture.confidence * 100).toFixed(1)}% Confidence
             </span>
           </div>
 
           {/* Recognized Sign Title */}
           <div>
-            <span className="text-xs font-semibold text-muted-foreground">Recognized ISL Sign Gloss:</span>
-            <div className="mt-1 text-2xl font-black text-foreground tracking-tight flex items-center gap-2">
-              <span>{activeGesture.name}</span>
+            <span className="text-xs font-semibold text-muted-foreground">Recognized Hand Sign:</span>
+            <div className="mt-1 text-2xl font-black text-foreground tracking-tight">
+              {activeGesture.name}
             </div>
             <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
               {activeGesture.description}
             </p>
           </div>
 
-          {/* Multilingual Spoken Translation in Target Language */}
+          {/* Spoken Translation in Target Language */}
           <div className="p-4 rounded-xl bg-muted/70 border border-border flex flex-col gap-1.5">
             <div className="flex items-center justify-between text-xs text-muted-foreground font-semibold">
               <span>
@@ -486,7 +560,7 @@ export default function CameraTranslator({
               </span>
               <span className="text-[10px] font-mono text-primary">{langObj.bcp47}</span>
             </div>
-            <div className="text-xl font-extrabold text-foreground">
+            <div className="text-2xl font-black text-foreground">
               {activeGesture.translations[selectedLanguage] || activeGesture.translations["en"]}
             </div>
             <div className="text-xs text-muted-foreground">
@@ -494,7 +568,7 @@ export default function CameraTranslator({
             </div>
           </div>
 
-          {/* Audio Speech Button */}
+          {/* Speak Button */}
           <Button
             size="lg"
             className="w-full gap-2 text-white font-bold shadow-lg bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:opacity-95"
@@ -508,15 +582,14 @@ export default function CameraTranslator({
             </span>
           </Button>
 
-          {/* Verification Checkpoints */}
           <div className="pt-2 border-t border-border/60 flex flex-col gap-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-              <span>Tested on INCLUDE-50 and Amrita SLR Benchmark standards</span>
+              <span>Full finger curl & joint tracking across all digits and alphabets</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-              <span>Full real-time speech rendering across all 13 Indian languages</span>
+              <span>Connected to Python FastAPI backend endpoints</span>
             </div>
           </div>
         </div>

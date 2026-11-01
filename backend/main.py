@@ -231,21 +231,131 @@ def read_root():
 def get_languages():
     return {"languages": INDIAN_LANGUAGES}
 
-@app.get("/api/dictionary")
-def get_dictionary(category: Optional[str] = None, search: Optional[str] = None):
-    results = DICTIONARY_ITEMS
-    if category and category.lower() != "all":
-        results = [item for item in results if item["category"].lower() == category.lower()]
-    if search:
-        s = search.lower()
-        results = [
-            item for item in results
-            if s in item["english"].lower()
-            or s in item["hindi"].lower()
-            or s in item["gujarati"].lower()
-            or s in item["gloss"].lower()
-        ]
-    return {"items": results, "count": len(results)}
+# Official ISLRTC Dataset: Numbers (0-9) from Ministry of Social Justice & Empowerment
+ISLRTC_DIGITS = [
+    {
+        "digit": "1",
+        "name": "One",
+        "finger_curls": [1.0, 0.0, 1.0, 1.0, 1.0],  # index up, others closed
+        "posture": "Index finger extended vertically upward, thumb across other closed fingers.",
+        "translations": {"gu": "એક", "hi": "एक", "en": "One", "mr": "एक", "bn": "এক", "ta": "ஒன்று", "te": "ఒకటి"},
+    },
+    {
+        "digit": "2",
+        "name": "Two",
+        "finger_curls": [1.0, 0.0, 0.0, 1.0, 1.0],  # index + middle up
+        "posture": "Index and middle fingers extended upward in V shape.",
+        "translations": {"gu": "બે", "hi": "दो", "en": "Two", "mr": "दोन", "bn": "দুই", "ta": "இரண்டு", "te": "రెండు"},
+    },
+    {
+        "digit": "3",
+        "name": "Three",
+        "finger_curls": [0.0, 0.0, 0.0, 1.0, 1.0],  # thumb + index + middle
+        "posture": "Thumb, index, and middle fingers extended upward.",
+        "translations": {"gu": "ત્રણ", "hi": "तीन", "en": "Three", "mr": "तीन", "bn": "তিন", "ta": "மூன்று", "te": "మూడు"},
+    },
+    {
+        "digit": "4",
+        "name": "Four",
+        "finger_curls": [1.0, 0.0, 0.0, 0.0, 0.0],  # 4 fingers up, thumb folded
+        "posture": "Four fingers extended upward with thumb folded into palm.",
+        "translations": {"gu": "ચાર", "hi": "चार", "en": "Four", "mr": "चार", "bn": "চার", "ta": "நான்கு", "te": "నాలుగు"},
+    },
+    {
+        "digit": "5",
+        "name": "Five",
+        "finger_curls": [0.0, 0.0, 0.0, 0.0, 0.0],  # all 5 fingers open
+        "posture": "All five fingers fanned out flat facing forward.",
+        "translations": {"gu": "પાંચ", "hi": "पाँच", "en": "Five", "mr": "पाच", "bn": "পাঁচ", "ta": "ஐந்து", "te": "ఐదు"},
+    },
+    {
+        "digit": "6",
+        "name": "Six",
+        "finger_curls": [1.0, 1.0, 1.0, 1.0, 0.0],  # pinky up, others closed
+        "posture": "Pinky finger extended upward with thumb across three closed fingers.",
+        "translations": {"gu": "છ", "hi": "छह", "en": "Six", "mr": "सहा", "bn": "ছয়", "ta": "ஆறு", "te": "ఆరు"},
+    },
+    {
+        "digit": "7",
+        "name": "Seven",
+        "finger_curls": [1.0, 0.5, 1.0, 1.0, 1.0],  # index bent horizontally
+        "posture": "Index finger bent at knuckle horizontally.",
+        "translations": {"gu": "સાત", "hi": "सात", "en": "Seven", "mr": "सात", "bn": "সাত", "ta": "ஏழு", "te": "ఏడు"},
+    },
+    {
+        "digit": "8",
+        "name": "Eight",
+        "finger_curls": [1.0, 1.0, 0.0, 0.0, 0.0],  # middle + ring + pinky up
+        "posture": "Middle, ring, and pinky fingers extended upward.",
+        "translations": {"gu": "આઠ", "hi": "आठ", "en": "Eight", "mr": "आठ", "bn": "আট", "ta": "எட்டு", "te": "ఎనిమిది"},
+    },
+    {
+        "digit": "9",
+        "name": "Nine",
+        "finger_curls": [0.8, 1.0, 1.0, 1.0, 1.0],  # thumb pointing down
+        "posture": "Thumb pointing downward with other fingers folded in fist.",
+        "translations": {"gu": "નવ", "hi": "नौ", "en": "Nine", "mr": "नऊ", "bn": "নয়", "ta": "ஒன்பது", "te": "తొమ్మిది"},
+    },
+    {
+        "digit": "0",
+        "name": "Zero",
+        "finger_curls": [0.6, 0.6, 0.6, 0.6, 0.6],  # oval circle O
+        "posture": "All fingertips touching thumb forming round oval zero.",
+        "translations": {"gu": "શૂન્ય", "hi": "शून्य", "en": "Zero", "mr": "शून्य", "bn": "শূন্য", "ta": "பூஜ்ஜியம்", "te": "సున్నా"},
+    },
+]
+
+# Official ISLRTC Dataset: English Alphabets (A-Z)
+ISLRTC_ALPHABETS = [
+    {"letter": "A", "hands": "Two-handed", "posture": "Both hands form fists with thumbs pointing vertically upright, tips touching."},
+    {"letter": "B", "hands": "Two-handed", "posture": "Both hands curve thumb and index fingers to form two touching circles."},
+    {"letter": "C", "hands": "One-handed", "posture": "Right hand fingers curved forming a clean 'C' arch."},
+    {"letter": "D", "hands": "Two-handed", "posture": "Left hand index pointing up while right thumb and index create loop touching left index."},
+    {"letter": "E", "hands": "Two-handed", "posture": "Left index vertical, right hand fingers touch top, middle, and bottom."},
+    {"letter": "F", "hands": "Two-handed", "posture": "Left index vertical, right index and middle cross horizontally across top."},
+    {"letter": "G", "hands": "Two-handed", "posture": "Both hands in fists, right fist placed on top of left fist."},
+    {"letter": "H", "hands": "Two-handed", "posture": "Left open palm flat horizontal, right hand sweeps across palm."},
+    {"letter": "I", "hands": "One-handed", "posture": "Right hand index finger touching right cheek or pointing near temple."},
+    {"letter": "J", "hands": "Two-handed", "posture": "Left palm open, right index draws a 'J' hook trajectory across left palm."},
+    {"letter": "K", "hands": "Two-handed", "posture": "Left index upright, right hand forms 'V' shape resting on left index."},
+    {"letter": "L", "hands": "One-handed", "posture": "Right thumb and index extended at 90-degree angle forming 'L'."},
+    {"letter": "M", "hands": "Two-handed", "posture": "Left open palm horizontal, three fingers of right hand placed upon palm."},
+    {"letter": "N", "hands": "Two-handed", "posture": "Left open palm horizontal, two fingers of right hand placed upon palm."},
+    {"letter": "O", "hands": "One-handed", "posture": "All fingertips and thumb of dominant hand touch to form circle 'O'."},
+    {"letter": "P", "hands": "Two-handed", "posture": "Left index upright, right thumb and index form loop touching top of left index."},
+    {"letter": "Q", "hands": "Two-handed", "posture": "Right hand forms loop hook over left hand index finger."},
+    {"letter": "R", "hands": "Two-handed", "posture": "Left open palm flat, right hand index and middle crossed resting on left palm."},
+    {"letter": "S", "hands": "Two-handed", "posture": "Pinky fingers of both hands hooked together firmly."},
+    {"letter": "T", "hands": "Two-handed", "posture": "Left index extended vertically, right index horizontal resting on top."},
+    {"letter": "U", "hands": "One-handed", "posture": "Index and middle fingers extended upward together forming 'U'."},
+    {"letter": "V", "hands": "One-handed", "posture": "Index and middle fingers extended upward spread apart forming 'V'."},
+    {"letter": "W", "hands": "Two-handed", "posture": "Fingers of both hands loosely interlocked pointing upward forming 'W'."},
+    {"letter": "X", "hands": "Two-handed", "posture": "Index fingers of both hands crossed over each other forming an 'X'."},
+    {"letter": "Y", "hands": "Two-handed", "posture": "Left index finger extended, right index and thumb form 'V' cradling the stem."},
+    {"letter": "Z", "hands": "Two-handed", "posture": "Left index vertical, right flat hand resting horizontally across base."},
+]
+
+@app.get("/api/dataset/digits")
+def get_dataset_digits():
+    return {"digits": ISLRTC_DIGITS, "total": len(ISLRTC_DIGITS)}
+
+@app.get("/api/dataset/digits/{digit}")
+def get_digit_detail(digit: str):
+    matched = next((d for d in ISLRTC_DIGITS if d["digit"] == digit), None)
+    if not matched:
+        raise HTTPException(status_code=404, detail="Digit not found")
+    return matched
+
+@app.get("/api/dataset/alphabets")
+def get_dataset_alphabets():
+    return {"alphabets": ISLRTC_ALPHABETS, "total": len(ISLRTC_ALPHABETS)}
+
+@app.get("/api/dataset/alphabets/{letter}")
+def get_alphabet_detail(letter: str):
+    matched = next((a for a in ISLRTC_ALPHABETS if a["letter"].upper() == letter.upper()), None)
+    if not matched:
+        raise HTTPException(status_code=404, detail="Alphabet not found")
+    return matched
 
 @app.post("/api/translate")
 def translate_text(req: TranslationRequest):

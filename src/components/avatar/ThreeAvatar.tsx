@@ -371,6 +371,227 @@ export default function ThreeAvatar({
           a.wr.rotation.set(0.2, 0, s * 0.1)
           for (let i = 0; i < 5; i++) curl(a.hand.f[i], 0.1, i === 0, s)
         })
+      } else if (g === "HELP") {
+        // Fist on flat open palm lifted upward
+        const lift = (Math.sin(t * 3) + 1) * 0.08
+        armR.sh.rotation.set(0.75 + lift, -0.2, 0.2)
+        armR.el.rotation.set(-1.7, 0.5, 0)
+        armL.sh.rotation.set(0.75 + lift, 0.2, -0.2)
+        armL.el.rotation.set(-1.7, -0.5, 0)
+        for (let i = 0; i < 5; i++) {
+          curl(armR.hand.f[i], 1.0, i === 0, 1) // Right hand in fist
+          curl(armL.hand.f[i], 0.05, i === 0, -1) // Left hand flat open
+        }
+      } else if (g === "WATER") {
+        // 3 fingers W-handshape tapping chin
+        const tap = Math.sin(t * 5) * 0.06
+        armR.sh.rotation.set(0.85 + tap, -0.2, 0.2)
+        armR.el.rotation.set(-1.9, 0.3, 0)
+        curl(armR.hand.f[0], 0.9, true, 1)
+        curl(armR.hand.f[1], 0.0, false, 1) // Index
+        curl(armR.hand.f[2], 0.0, false, 1) // Middle
+        curl(armR.hand.f[3], 0.0, false, 1) // Ring
+        curl(armR.hand.f[4], 1.0, false, 1) // Pinky
+      } else if (g === "YES") {
+        head.rotation.x = Math.sin(t * 4) * 0.15
+        armR.sh.rotation.set(0.65, -0.2, 0.2)
+        armR.el.rotation.set(-1.7 + Math.sin(t * 4) * 0.1, 0.3, 0)
+        for (let i = 0; i < 5; i++) curl(armR.hand.f[i], 1.0, i === 0, 1)
+      } else if (g === "NO") {
+        head.rotation.y = Math.sin(t * 4) * 0.18
+        armR.sh.rotation.set(0.65, -0.2, 0.2)
+        armR.el.rotation.set(-1.6, 0.3, 0)
+        curl(armR.hand.f[1], Math.sin(t * 4) > 0 ? 0 : 0.8, false, 1)
+        curl(armR.hand.f[2], Math.sin(t * 4) > 0 ? 0 : 0.8, false, 1)
+      } else if (g.startsWith("NUMBER_") || g.startsWith("DIGIT_")) {
+        // === OFFICIAL ISLRTC DIGIT PROCEDURAL RIGGING ===
+        const num = g.replace("NUMBER_", "").replace("DIGIT_", "")
+        head.rotation.set(0.05, 0, 0)
+        mouth.scale.set(1.1, 0.4, 1)
+
+        // Raise right hand to clear chest viewing position
+        armR.sh.rotation.set(0.65, -0.2, 0.25)
+        armR.el.rotation.set(-1.8, 0.3, 0)
+        armR.wr.rotation.set(0.1, 0, 0)
+
+        armL.sh.rotation.set(REST.sx, 0, -REST.sz)
+        armL.el.rotation.set(REST.ex, 0, 0)
+
+        if (num === "1") {
+          // Index straight up, others closed
+          curl(armR.hand.f[0], 1.0, true, 1)
+          curl(armR.hand.f[1], 0.0, false, 1) // Index UP
+          curl(armR.hand.f[2], 1.0, false, 1)
+          curl(armR.hand.f[3], 1.0, false, 1)
+          curl(armR.hand.f[4], 1.0, false, 1)
+        } else if (num === "2") {
+          // Index and Middle up in V shape
+          curl(armR.hand.f[0], 1.0, true, 1)
+          curl(armR.hand.f[1], 0.0, false, 1)
+          curl(armR.hand.f[2], 0.0, false, 1)
+          curl(armR.hand.f[3], 1.0, false, 1)
+          curl(armR.hand.f[4], 1.0, false, 1)
+        } else if (num === "3") {
+          // Thumb, Index, Middle up
+          curl(armR.hand.f[0], 0.0, true, 1)
+          curl(armR.hand.f[1], 0.0, false, 1)
+          curl(armR.hand.f[2], 0.0, false, 1)
+          curl(armR.hand.f[3], 1.0, false, 1)
+          curl(armR.hand.f[4], 1.0, false, 1)
+        } else if (num === "4") {
+          // Thumb folded across palm, 4 fingers extended straight up!
+          curl(armR.hand.f[0], 1.0, true, 1) // Thumb folded across palm
+          curl(armR.hand.f[1], 0.0, false, 1) // Index UP
+          curl(armR.hand.f[2], 0.0, false, 1) // Middle UP
+          curl(armR.hand.f[3], 0.0, false, 1) // Ring UP
+          curl(armR.hand.f[4], 0.0, false, 1) // Pinky UP
+        } else if (num === "5") {
+          // All 5 fingers extended wide open!
+          curl(armR.hand.f[0], 0.0, true, 1)
+          curl(armR.hand.f[1], 0.0, false, 1)
+          curl(armR.hand.f[2], 0.0, false, 1)
+          curl(armR.hand.f[3], 0.0, false, 1)
+          curl(armR.hand.f[4], 0.0, false, 1)
+        } else if (num === "6") {
+          // Pinky finger extended, others closed into fist
+          curl(armR.hand.f[0], 1.0, true, 1)
+          curl(armR.hand.f[1], 1.0, false, 1)
+          curl(armR.hand.f[2], 1.0, false, 1)
+          curl(armR.hand.f[3], 1.0, false, 1)
+          curl(armR.hand.f[4], 0.0, false, 1) // Pinky UP
+        } else if (num === "7") {
+          // Index finger bent at knuckle
+          curl(armR.hand.f[0], 1.0, true, 1)
+          curl(armR.hand.f[1], 0.6, false, 1) // Bent
+          curl(armR.hand.f[2], 1.0, false, 1)
+          curl(armR.hand.f[3], 1.0, false, 1)
+          curl(armR.hand.f[4], 1.0, false, 1)
+        } else if (num === "8") {
+          // Middle, Ring, Pinky extended
+          curl(armR.hand.f[0], 1.0, true, 1)
+          curl(armR.hand.f[1], 1.0, false, 1)
+          curl(armR.hand.f[2], 0.0, false, 1)
+          curl(armR.hand.f[3], 0.0, false, 1)
+          curl(armR.hand.f[4], 0.0, false, 1)
+        } else if (num === "9") {
+          // Thumb pointing downward, others folded
+          armR.wr.rotation.set(-0.5, 0, 0)
+          curl(armR.hand.f[0], 0.0, true, 1)
+          curl(armR.hand.f[1], 1.0, false, 1)
+          curl(armR.hand.f[2], 1.0, false, 1)
+          curl(armR.hand.f[3], 1.0, false, 1)
+          curl(armR.hand.f[4], 1.0, false, 1)
+        } else {
+          // Zero: All fingertips touching thumb forming circle O
+          for (let i = 0; i < 5; i++) curl(armR.hand.f[i], 0.55, i === 0, 1)
+        }
+      } else if (g.startsWith("LETTER_")) {
+        // === OFFICIAL ISLRTC ALPHABETS PROCEDURAL RIGGING ===
+        const letter = g.replace("LETTER_", "").toUpperCase()
+        head.rotation.set(0.06, 0, 0)
+        mouth.scale.set(1.1, 0.45, 1)
+
+        if (letter === "A") {
+          // Both hands fists with thumbs pointing vertically upright touching at the tips!
+          armR.sh.rotation.set(0.8, -0.4, 0.3)
+          armR.el.rotation.set(-1.7, 0.6, 0)
+          armL.sh.rotation.set(0.8, 0.4, -0.3)
+          armL.el.rotation.set(-1.7, -0.6, 0)
+          ;[armR, armL].forEach((a) => {
+            const s = a.s
+            curl(a.hand.f[0], 0.0, true, s) // Thumb UP
+            curl(a.hand.f[1], 1.0, false, s) // Fist
+            curl(a.hand.f[2], 1.0, false, s)
+            curl(a.hand.f[3], 1.0, false, s)
+            curl(a.hand.f[4], 1.0, false, s)
+          })
+        } else if (letter === "B") {
+          // Both hands curve thumb & index to form touching circles of B
+          armR.sh.rotation.set(0.75, -0.3, 0.2)
+          armR.el.rotation.set(-1.6, 0.5, 0)
+          armL.sh.rotation.set(0.75, 0.3, -0.2)
+          armL.el.rotation.set(-1.6, -0.5, 0)
+          ;[armR, armL].forEach((a) => {
+            const s = a.s
+            for (let i = 0; i < 5; i++) curl(a.hand.f[i], 0.5, i === 0, s)
+          })
+        } else if (letter === "C") {
+          // Right hand curved in C shape
+          armR.sh.rotation.set(0.7, -0.2, 0.2)
+          armR.el.rotation.set(-1.7, 0.3, 0)
+          armL.sh.rotation.set(REST.sx, 0, -REST.sz)
+          armL.el.rotation.set(REST.ex, 0, 0)
+          for (let i = 0; i < 5; i++) curl(armR.hand.f[i], 0.45, i === 0, 1)
+        } else if (letter === "D") {
+          // Left index up, right thumb and index forming circle
+          armL.sh.rotation.set(0.75, 0.3, -0.2)
+          armL.el.rotation.set(-1.6, -0.4, 0)
+          curl(armL.hand.f[0], 1.0, true, -1)
+          curl(armL.hand.f[1], 0.0, false, -1) // Upright index
+          curl(armL.hand.f[2], 1.0, false, -1)
+          curl(armL.hand.f[3], 1.0, false, -1)
+          curl(armL.hand.f[4], 1.0, false, -1)
+
+          armR.sh.rotation.set(0.75, -0.3, 0.2)
+          armR.el.rotation.set(-1.6, 0.4, 0)
+          for (let i = 0; i < 5; i++) curl(armR.hand.f[i], 0.5, i === 0, 1)
+        } else if (letter === "L") {
+          // Right thumb and index at 90 degrees
+          armR.sh.rotation.set(0.7, -0.2, 0.2)
+          armR.el.rotation.set(-1.7, 0.3, 0)
+          armL.sh.rotation.set(REST.sx, 0, -REST.sz)
+          armL.el.rotation.set(REST.ex, 0, 0)
+          curl(armR.hand.f[0], 0.0, true, 1) // Thumb out
+          curl(armR.hand.f[1], 0.0, false, 1) // Index up
+          curl(armR.hand.f[2], 1.0, false, 1)
+          curl(armR.hand.f[3], 1.0, false, 1)
+          curl(armR.hand.f[4], 1.0, false, 1)
+        } else if (letter === "V") {
+          // V shape index & middle
+          armR.sh.rotation.set(0.7, -0.2, 0.2)
+          armR.el.rotation.set(-1.7, 0.3, 0)
+          armL.sh.rotation.set(REST.sx, 0, -REST.sz)
+          armL.el.rotation.set(REST.ex, 0, 0)
+          curl(armR.hand.f[0], 1.0, true, 1)
+          curl(armR.hand.f[1], 0.0, false, 1)
+          curl(armR.hand.f[2], 0.0, false, 1)
+          curl(armR.hand.f[3], 1.0, false, 1)
+          curl(armR.hand.f[4], 1.0, false, 1)
+        } else if (letter === "W") {
+          // Interlocked fingers pointing upward
+          armR.sh.rotation.set(0.75, -0.3, 0.2)
+          armR.el.rotation.set(-1.6, 0.4, 0)
+          armL.sh.rotation.set(0.75, 0.3, -0.2)
+          armL.el.rotation.set(-1.6, -0.4, 0)
+          ;[armR, armL].forEach((a) => {
+            const s = a.s
+            for (let i = 0; i < 5; i++) curl(a.hand.f[i], 0.1, i === 0, s)
+          })
+        } else if (letter === "Z") {
+          // Left index upright, right flat hand resting horizontally across base
+          armL.sh.rotation.set(0.75, 0.3, -0.2)
+          armL.el.rotation.set(-1.6, -0.4, 0)
+          curl(armL.hand.f[1], 0.0, false, -1) // Upright index
+          for (let i = 2; i < 5; i++) curl(armL.hand.f[i], 1.0, false, -1)
+
+          armR.sh.rotation.set(0.7, -0.2, 0.2)
+          armR.el.rotation.set(-1.5, 0.3, 0)
+          for (let i = 0; i < 5; i++) curl(armR.hand.f[i], 0.05, i === 0, 1) // Flat hand
+        } else {
+          // Generic two-handed or one-handed alphabet posture
+          armR.sh.rotation.set(0.75, -0.25, 0.2)
+          armR.el.rotation.set(-1.6, 0.4, 0)
+          armL.sh.rotation.set(0.75, 0.25, -0.2)
+          armL.el.rotation.set(-1.6, -0.4, 0)
+          ;[armR, armL].forEach((a) => {
+            const s = a.s
+            curl(a.hand.f[0], 0.2, true, s)
+            curl(a.hand.f[1], 0.0, false, s)
+            curl(a.hand.f[2], 0.5, false, s)
+            curl(a.hand.f[3], 0.8, false, s)
+            curl(a.hand.f[4], 0.8, false, s)
+          })
+        }
       } else {
         // Default 10-Second Continuous Prototype Timeline
         const R = sm(seg(t, 4, 6)) * (1 - sm(seg(t, 8.2, 10)))

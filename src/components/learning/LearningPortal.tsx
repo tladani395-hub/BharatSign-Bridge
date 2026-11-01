@@ -164,6 +164,7 @@ export default function LearningPortal({ currentLanguage = "gu" }: LearningPorta
                     onClick={() => {
                       setSelectedLetter(char)
                       setPracticeAccuracy(null)
+                      handlePronounce(char)
                     }}
                     className={`h-10 rounded-xl font-black text-xs transition-all ${
                       selectedLetter === char
@@ -306,6 +307,20 @@ export default function LearningPortal({ currentLanguage = "gu" }: LearningPorta
                     onClick={() => {
                       setSelectedNumber(num)
                       setPracticeAccuracy(null)
+                      const numNames: Record<string, Record<string, string>> = {
+                        "1": { gu: "એક", hi: "एक", en: "One" },
+                        "2": { gu: "બે", hi: "दो", en: "Two" },
+                        "3": { gu: "ત્રણ", hi: "तीन", en: "Three" },
+                        "4": { gu: "ચાર", hi: "चार", en: "Four" },
+                        "5": { gu: "પાંચ", hi: "पाँच", en: "Five" },
+                        "6": { gu: "છ", hi: "छह", en: "Six" },
+                        "7": { gu: "સાત", hi: "सात", en: "Seven" },
+                        "8": { gu: "આઠ", hi: "आठ", en: "Eight" },
+                        "9": { gu: "નવ", hi: "नौ", en: "Nine" },
+                        "0": { gu: "શૂન્ય", hi: "शून्य", en: "Zero" },
+                      }
+                      const word = numNames[num]?.[currentLanguage] || numNames[num]?.["en"] || num
+                      handlePronounce(word)
                     }}
                     className={`h-12 rounded-xl font-black text-sm transition-all ${
                       selectedNumber === num
