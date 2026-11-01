@@ -48,7 +48,16 @@ function parseSentenceToTokens(text: string): SignToken[] {
     }
 
     // Check common ISL vocabulary words
-    if (["HELLO", "HI", "NAMASTE", "MORNING", "GOOD", "PRANAM"].includes(w)) {
+    if (["HELLO", "HI"].includes(w)) {
+      result.push({
+        id: String(idCounter++),
+        word: raw,
+        gloss: "HELLO",
+        gesture: "HELLO",
+        duration: 1.3,
+        facialBlendshape: "gentle_smile"
+      })
+    } else if (["NAMASTE", "PRANAM", "GREETINGS"].includes(w)) {
       result.push({
         id: String(idCounter++),
         word: raw,
@@ -56,6 +65,33 @@ function parseSentenceToTokens(text: string): SignToken[] {
         gesture: "NAMASTE",
         duration: 1.3,
         facialBlendshape: "gentle_smile"
+      })
+    } else if (["WELCOME", "SWAGATAM"].includes(w)) {
+      result.push({
+        id: String(idCounter++),
+        word: raw,
+        gloss: "WELCOME",
+        gesture: "WELCOME",
+        duration: 1.4,
+        facialBlendshape: "hospitality_smile"
+      })
+    } else if (["INDIA", "BHARAT"].includes(w)) {
+      result.push({
+        id: String(idCounter++),
+        word: raw,
+        gloss: "BHARAT-INDIA",
+        gesture: "INDIA",
+        duration: 1.3,
+        facialBlendshape: "affirmative"
+      })
+    } else if (["FRIEND", "DOST", "MITRA"].includes(w)) {
+      result.push({
+        id: String(idCounter++),
+        word: raw,
+        gloss: "FRIEND",
+        gesture: "FRIEND",
+        duration: 1.2,
+        facialBlendshape: "smile"
       })
     } else if (["THANK", "THANKS", "THANKYOU", "DHANYAVAD", "ABHAR"].includes(w)) {
       result.push({

@@ -318,7 +318,84 @@ export default function ThreeAvatar({
     function animateTimeline(t: number) {
       const g = currentGestureRef.current
 
-      if (g === "NAMASTE") {
+      if (g === "HELLO") {
+        // Dominant right hand raised to temple/forehead, waving outward with a friendly smile
+        const wave = Math.sin(t * 6) * 0.18
+        head.rotation.set(0.04, 0.05, 0)
+        mouth.scale.set(1.25, 0.6, 1) // Smile
+        armR.sh.rotation.set(1.15, -0.3, 0.35 + wave * 0.5)
+        armR.el.rotation.set(-2.0, 0.3, 0)
+        armR.wr.rotation.set(0.2, 0, 0.3 + wave)
+        for (let i = 0; i < 5; i++) curl(armR.hand.f[i], 0.08, i === 0, 1) // Open waving hand
+
+        armL.sh.rotation.set(REST.sx, 0, -REST.sz)
+        armL.el.rotation.set(REST.ex, 0, 0)
+      } else if (g === "WELCOME") {
+        // Both hands sweeping inward inviting toward chest with hospitable smile
+        const sweep = (Math.sin(t * 3) + 1) * 0.12
+        head.rotation.set(0.08, 0, 0)
+        mouth.scale.set(1.25, 0.55, 1)
+        ;[armR, armL].forEach((a) => {
+          const s = a.s
+          a.sh.rotation.set(0.7 + sweep * 0.2, s * -0.4, s * (0.5 - sweep))
+          a.el.rotation.set(-1.6, s * 0.4, 0)
+          a.wr.rotation.set(0.2, 0, s * -0.3)
+          for (let i = 0; i < 5; i++) curl(a.hand.f[i], 0.1, i === 0, s)
+        })
+      } else if (g === "PLEASE") {
+        // Flat right hand circling gently over sternum / chest
+        const circX = Math.sin(t * 4) * 0.06
+        const circY = Math.cos(t * 4) * 0.06
+        head.rotation.set(0.06, 0, 0)
+        mouth.scale.set(1.15, 0.45, 1)
+        armR.sh.rotation.set(0.85 + circY, -0.4 + circX, 0.3)
+        armR.el.rotation.set(-1.8, 0.4, 0)
+        for (let i = 0; i < 5; i++) curl(armR.hand.f[i], 0.05, i === 0, 1)
+        armL.sh.rotation.set(REST.sx, 0, -REST.sz)
+        armL.el.rotation.set(REST.ex, 0, 0)
+      } else if (g === "HOW_ARE_YOU") {
+        // Knuckles together rotating outward, then pointing with inquiring head tilt
+        const phase = (Math.sin(t * 3) + 1) / 2
+        head.rotation.set(0.04, phase * 0.12, 0.05)
+        lids.forEach((o) => {
+          if (o.userData.y) o.position.y = o.userData.y + 0.005
+        })
+        armR.sh.rotation.set(0.7 + phase * 0.2, -0.25, 0.2)
+        armR.el.rotation.set(-1.7 + phase * 0.5, 0.3, 0)
+        if (phase > 0.5) {
+          curl(armR.hand.f[0], 1.0, true, 1)
+          curl(armR.hand.f[1], 0.0, false, 1)
+          for (let i = 2; i < 5; i++) curl(armR.hand.f[i], 1.0, false, 1)
+        } else {
+          for (let i = 0; i < 5; i++) curl(armR.hand.f[i], 0.2, i === 0, 1)
+        }
+        armL.sh.rotation.set(REST.sx, 0, -REST.sz)
+        armL.el.rotation.set(REST.ex, 0, 0)
+      } else if (g === "INDIA") {
+        // Right hand touches center of forehead (tilak) then opens outward in national salute
+        const phase = (Math.sin(t * 2.5) + 1) / 2
+        head.rotation.set(0.06, 0, 0)
+        mouth.scale.set(1.2, 0.5, 1)
+        armR.sh.rotation.set(1.1 - phase * 0.3, -0.2 - phase * 0.2, 0.25 + phase * 0.2)
+        armR.el.rotation.set(-2.0 + phase * 0.6, 0.3, 0)
+        curl(armR.hand.f[0], 0.3, true, 1)
+        curl(armR.hand.f[1], 0.0, false, 1)
+        for (let i = 2; i < 5; i++) curl(armR.hand.f[i], phase * 0.3, false, 1)
+        armL.sh.rotation.set(REST.sx, 0, -REST.sz)
+        armL.el.rotation.set(REST.ex, 0, 0)
+      } else if (g === "FRIEND") {
+        // Index fingers of both hands hook together alternately
+        head.rotation.set(0.05, 0, 0)
+        mouth.scale.set(1.25, 0.55, 1)
+        ;[armR, armL].forEach((a) => {
+          const s = a.s
+          a.sh.rotation.set(0.75, s * -0.3, s * 0.2)
+          a.el.rotation.set(-1.6, s * 0.45, 0)
+          curl(a.hand.f[0], 1.0, true, s)
+          curl(a.hand.f[1], 0.4, false, s)
+          for (let i = 2; i < 5; i++) curl(a.hand.f[i], 1.0, false, s)
+        })
+      } else if (g === "NAMASTE") {
         // Both hands meet at chest with head nod & smile
         const nod = Math.sin(t * 3) * 0.06
         head.rotation.set(0.12 + nod, 0, 0)

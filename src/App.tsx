@@ -116,20 +116,82 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 pt-2">
-                {["NAMASTE", "THANK_YOU", "WHAT_IS_YOUR_NAME", "STUDENT", "HELP", "WATER"].map((g) => (
-                  <button
-                    key={g}
-                    onClick={() => setAvatarGesture(g)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      avatarGesture === g
-                        ? "bg-primary text-white border-primary shadow-md"
-                        : "bg-muted text-foreground border-border hover:bg-muted/80"
-                    }`}
-                  >
-                    Animate {g.replace(/_/g, " ")}
-                  </button>
-                ))}
+              <div className="flex flex-col gap-2.5 pt-2 w-full">
+                <div className="flex items-center justify-between text-xs text-muted-foreground font-semibold">
+                  <span>Common Words & Greetings:</span>
+                  <span className="text-[11px] text-cyan-500 font-mono">Active: {avatarGesture.replace(/_/g, " ")}</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { g: "HELLO", label: "Hello 👋" },
+                    { g: "NAMASTE", label: "Namaste 🙏" },
+                    { g: "WELCOME", label: "Welcome ✨" },
+                    { g: "THANK_YOU", label: "Thank You" },
+                    { g: "HOW_ARE_YOU", label: "How Are You?" },
+                    { g: "STUDENT", label: "Student" },
+                    { g: "HELP", label: "Help" },
+                    { g: "WATER", label: "Water" },
+                    { g: "YES", label: "Yes" },
+                    { g: "NO", label: "No" },
+                    { g: "INDIA", label: "India 🇮🇳" },
+                  ].map(({ g, label }) => (
+                    <button
+                      key={g}
+                      onClick={() => setAvatarGesture(g)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                        avatarGesture === g
+                          ? "bg-primary text-white border-primary shadow-md scale-105"
+                          : "bg-muted text-foreground border-border hover:bg-muted/80"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-muted-foreground font-semibold pt-1">
+                  <span>Numeric Digits (0–9):</span>
+                </div>
+                <div className="grid grid-cols-5 sm:grid-cols-10 gap-1">
+                  {["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"].map((num) => {
+                    const key = `NUMBER_${num}`
+                    return (
+                      <button
+                        key={num}
+                        onClick={() => setAvatarGesture(key)}
+                        className={`h-8 rounded-lg font-black text-xs border transition-all ${
+                          avatarGesture === key
+                            ? "bg-indigo-600 text-white border-indigo-500 shadow-md scale-105"
+                            : "bg-muted text-foreground border-border hover:bg-muted/80"
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-muted-foreground font-semibold pt-1">
+                  <span>Alphabets (A–Z):</span>
+                </div>
+                <div className="grid grid-cols-7 sm:grid-cols-9 gap-1">
+                  {Array.from("ABCDEFGHIJKLMNOPQRSTUVWXYZ").map((char) => {
+                    const key = `LETTER_${char}`
+                    return (
+                      <button
+                        key={char}
+                        onClick={() => setAvatarGesture(key)}
+                        className={`h-7 rounded-md font-bold text-[11px] border transition-all ${
+                          avatarGesture === key
+                            ? "bg-cyan-600 text-white border-cyan-500 shadow-md scale-105"
+                            : "bg-muted text-foreground border-border hover:bg-muted/80"
+                        }`}
+                      >
+                        {char}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             </div>
 
