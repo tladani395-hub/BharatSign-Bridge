@@ -290,6 +290,67 @@ def test_translate_gibberish_returns_no_match():
     assert data.get("status") == "no_match"
     assert data.get("matched") is False
 
+def test_social_login_google_and_github():
+    # 1. Invalid provider rejection
+    res_bad = client.post("/api/auth/social-login", json={
+        "provider": "facebook",
+        "email": "test@gmail.com",
+        "name": "Test User"
+    })
+    assert res_bad.status_code == 400
+
+    # 2. Invalid email rejection
+    res_no_email = client.post("/api/auth/social-login", json={
+        "provider": "google",
+        "email": "invalid_email_format",
+        "name": "Test User"
+    })
+    assert res_no_email.status_code == 400
+
+    # 3. New user sign up with Google
+    test_google_email = "student.oauth.google@bharatsign.ai"
+    res_g_signup = client.post("/api/auth/social-login", json={
+        "provider": "google",
+        "provider_id": "google_sub_10928374",
+        "email": test_google_email,
+        "name": "Google Learner",
+        "avatar_url": "https://lh3.googleusercontent.com/a/default-avatar"
+    })
+    assert res_g_signup.status_code == 200
+    g_data = res_g_signup.json()
+    assert g_data["status"] == "success"
+    assert "token" in g_data
+    assert len(g_data["token"]) > 30
+    assert g_data["user"]["email"] == test_google_email
+    assert g_data["user"]["name"] == "Google Learner"
+
+    # 4. Subsequent sign in with Google (existing user)
+    res_g_signin = client.post("/api/auth/social-login", json={
+        "provider": "google",
+        "provider_id": "google_sub_10928374",
+        "email": test_google_email,
+        "name": "Google Learner"
+    })
+    assert res_g_signin.status_code == 200
+    g_signin_data = res_g_signin.json()
+    assert g_signin_data["isNewUser"] is False
+    assert g_signin_data["token"] is not None
+
+    # 5. Sign up / in with GitHub
+    test_gh_email = "developer.oauth.github@bharatsign.ai"
+    res_gh = client.post("/api/auth/social-login", json={
+        "provider": "github",
+        "provider_id": "github_id_8829102",
+        "email": test_gh_email,
+        "name": "GitHub Contributor",
+        "avatar_url": "https://avatars.githubusercontent.com/u/12345678"
+    })
+    assert res_gh.status_code == 200
+    gh_data = res_gh.json()
+    assert gh_data["status"] == "success"
+    assert "token" in gh_data
+    assert gh_data["user"]["email"] == test_gh_email
+    assert gh_data["user"]["name"] == "GitHub Contributor"
 
 
 if __name__ == "__main__":
@@ -315,6 +376,7 @@ if __name__ == "__main__":
         test_recognize_sign_namaste_rejects_hands_above_head,
         test_leaderboard_does_not_leak_emails,
         test_translate_gibberish_returns_no_match,
+        test_social_login_google_and_github,
     ]
 
     passed = 0

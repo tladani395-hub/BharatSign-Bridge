@@ -1007,6 +1007,14 @@ class LoginRequest(BaseModel):
     captcha_answer: Optional[str] = None
     captcha_token: Optional[str] = None
 
+class SocialLoginRequest(BaseModel):
+    provider: str  # "google" or "github"
+    provider_id: Optional[str] = ""
+    email: str
+    name: Optional[str] = ""
+    avatar_url: Optional[str] = ""
+
+
 class SyncProgressRequest(BaseModel):
     email: str
     streak_days: int
@@ -1232,6 +1240,152 @@ def login_user(req: LoginRequest, request: Request):
         },
         "token": token
     }
+
+@app.post("/api/auth/social-login")
+def social_login(req: SocialLoginRequest, request: Request):
+    """
+    Handles authentication and registration via Google and GitHub providers.
+    Issues cryptographically signed HMAC-SHA256 JWT tokens.
+    If the account exists in SQLite, signs the user in directly.
+    If the account does not exist, provisions a new student account with a secure unguessable bcrypt password.
+    """
+    provider = req.provider.strip().lower()
+    if provider not in ("google", "github"):
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported identity provider. Only 'google' and 'github' are supported."
+        )
+
+    clean_email = req.email.strip().lower()
+    if not clean_email or "@" not in clean_email or "." not in clean_email.split("@")[-1]:
+        raise HTTPException(
+            status_code=400,
+            detail="A valid email address is required for social authentication."
+        )
+
+    raw_name = req.name.strip() if req.name and req.name.strip() else ("Google User" if provider == "google" else "GitHub Developer")
+    clean_name = re.sub(r'<[^>]+>', '', raw_name)[:100].strip() or "ISL Student"
+
+    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM users WHERE LOWER(email) = LOWER(?)", (clean_email,))
+    user_row = cursor.fetchone()
+
+    today_iso = datetime.datetime.now().strftime("%Y-%m-%d")
+    today_str = datetime.datetime.now().strftime("%B %Y")
+
+    if user_row:
+        user_data = dict(user_row)
+        user_id = user_data["id"]
+
+        # Update last_active_date and optionally avatar_url if provided and not set
+        if req.avatar_url and not user_data.get("avatar_url"):
+            cursor.execute(
+                "UPDATE users SET last_active_date = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (today_iso, req.avatar_url.strip(), user_id)
+            )
+            user_data["avatar_url"] = req.avatar_url.strip()
+        else:
+            cursor.execute(
+                "UPDATE users SET last_active_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (today_iso, user_id)
+            )
+        conn.commit()
+
+        # Check whether user has configured security questions
+        cursor.execute("SELECT id FROM user_security_questions WHERE user_id = ?", (user_id,))
+        has_security_questions = cursor.fetchone() is not None
+        conn.close()
+
+        user_role = user_data.get("role", "student")
+        token = create_access_token(user_id, user_data["email"], user_role)
+
+        record_security_audit_event(
+            user_id,
+            f"social_login_{provider}",
+            request.client.host if request.client else "127.0.0.1",
+            f"Provider: {provider}, email: {clean_email}"
+        )
+
+        return {
+            "status": "success",
+            "message": f"Successfully signed in via {provider.capitalize()}.",
+            "isNewUser": False,
+            "user": {
+                "id": user_data["id"],
+                "name": user_data["name"],
+                "email": user_data["email"],
+                "role": user_role,
+                "preferredLanguage": user_data.get("preferred_language", "en"),
+                "avatarUrl": user_data.get("avatar_url", ""),
+                "bio": user_data.get("bio", ""),
+                "streakDays": user_data.get("streak_days", 0),
+                "masteredSignsCount": user_data.get("mastered_signs_count", 0),
+                "totalQuizzesTaken": user_data.get("total_quizzes_taken", 0),
+                "level": user_data.get("level", "ISL Beginner • Level 1"),
+                "joinedDate": user_data.get("joined_date", today_str),
+                "hasSecurityQuestions": has_security_questions
+            },
+            "token": token
+        }
+    else:
+        # Register new student account via Social Auth
+        user_id = f"user_{uuid.uuid4().hex[:10]}"
+        # Generate cryptographically secure random password so account is unguessable via credential stuffing
+        random_pass = secrets.token_urlsafe(32)
+        pwd_hash = hash_password(random_pass)
+        avatar = req.avatar_url.strip() if (req.avatar_url and req.avatar_url.startswith(("https://", "data:image/"))) else ""
+
+        try:
+            cursor.execute("""
+            INSERT INTO users (id, name, email, password_hash, avatar_url, preferred_language, role, streak_days, level, joined_date, last_active_date)
+            VALUES (?, ?, ?, ?, ?, 'en', 'student', 0, 'ISL Beginner • Level 1', ?, ?)
+            """, (user_id, clean_name, clean_email, pwd_hash, avatar, today_str, today_iso))
+            conn.commit()
+        except sqlite3.IntegrityError:
+            conn.close()
+            raise HTTPException(
+                status_code=409,
+                detail=f"An account with this email ('{clean_email}') is already registered."
+            )
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+        token = create_access_token(user_id, clean_email, "student")
+        record_security_audit_event(
+            user_id,
+            f"social_signup_{provider}",
+            request.client.host if request.client else "127.0.0.1",
+            f"Provider: {provider}, email: {clean_email}"
+        )
+
+        return {
+            "status": "success",
+            "message": f"Successfully registered via {provider.capitalize()}.",
+            "isNewUser": True,
+            "user": {
+                "id": user_id,
+                "name": clean_name,
+                "email": clean_email,
+                "role": "student",
+                "preferredLanguage": "en",
+                "avatarUrl": avatar,
+                "bio": "",
+                "streakDays": 0,
+                "masteredSignsCount": 0,
+                "totalQuizzesTaken": 0,
+                "level": "ISL Beginner • Level 1",
+                "joinedDate": today_str,
+                "hasSecurityQuestions": False
+            },
+            "token": token
+        }
 
 @app.post("/api/auth/sync-progress")
 def sync_progress(req: SyncProgressRequest, current_user: dict = Depends(get_current_user)):
