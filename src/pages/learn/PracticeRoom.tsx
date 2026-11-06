@@ -61,6 +61,8 @@ export default function PracticeRoom({ currentLanguage }: PracticeRoomProps) {
     postureGuide = data?.meaning || "Perform the authentic grammatical movement as demonstrated."
   }
 
+  const [lastRecognizedSign, setLastRecognizedSign] = useState<string | null>(null)
+
   const handleSimulateVerification = () => {
     setIsVerifying(true)
     setMatchScore(null)
@@ -68,10 +70,18 @@ export default function PracticeRoom({ currentLanguage }: PracticeRoomProps) {
 
     setTimeout(() => {
       setIsVerifying(false)
-      const score = Math.floor(91 + Math.random() * 8)
-      setMatchScore(score)
+      // Check if recognized sign matches the target sign
+      const targetNormalized = activeGesture.toUpperCase().replace(/[-_]/g, "")
+      const recognizedNormalized = (lastRecognizedSign || "").toUpperCase().replace(/[-_]/g, "")
 
-      if (score >= 85) {
+      const isMatch = Boolean(
+        lastRecognizedSign &&
+        (recognizedNormalized.includes(targetNormalized) || targetNormalized.includes(recognizedNormalized))
+      )
+
+      if (isMatch) {
+        const score = Math.floor(86 + Math.random() * 8)
+        setMatchScore(score)
         setPassedSign(true)
         recordLessonCompleted(activeGesture)
         const praise =
@@ -82,7 +92,13 @@ export default function PracticeRoom({ currentLanguage }: PracticeRoomProps) {
             : `Excellent! ${score} percent accuracy match. Sign verified successfully!`
         speakText(praise, currentLanguage)
       } else {
-        speakText(`Accuracy score is ${score} percent. Adjust your hand position and retry.`, currentLanguage)
+        const score = lastRecognizedSign ? Math.floor(45 + Math.random() * 25) : 0
+        setMatchScore(score)
+        setPassedSign(false)
+        const retryMsg = lastRecognizedSign
+          ? `Detected sign '${lastRecognizedSign}' does not match target '${signTitle}'. Adjust your hand position and retry.`
+          : `No hand gesture detected in camera frame. Position hands in camera view and retry.`
+        speakText(retryMsg, currentLanguage)
       }
     }, 1100)
   }
@@ -359,7 +375,10 @@ export default function PracticeRoom({ currentLanguage }: PracticeRoomProps) {
             </div>
 
             <div className="rounded-2xl overflow-hidden bg-card border border-border shadow-xl">
-              <CameraTranslator selectedLanguage={currentLanguage} />
+              <CameraTranslator
+                selectedLanguage={currentLanguage}
+                onSignRecognized={(gloss) => setLastRecognizedSign(gloss)}
+              />
             </div>
 
             {/* Score & Congratulation Banner */}

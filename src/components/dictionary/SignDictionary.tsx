@@ -237,7 +237,7 @@ export default function SignDictionary({ currentLanguage = "gu" }: SignDictionar
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               ISL Lexicon & Dictionary Explorer
             </span>
-            <span className="text-xs text-primary font-bold">10,000+ Term Aligned</span>
+            <span className="text-xs text-primary font-bold">50+ Authentic Signs (ISLRTC Aligned)</span>
           </div>
 
           {/* Search Bar */}

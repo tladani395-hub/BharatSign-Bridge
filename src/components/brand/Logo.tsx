@@ -9,6 +9,7 @@ interface LogoProps {
 
 export default function Logo({
   variant = "full",
+  theme = "auto",
   size = "md",
   className = "",
 }: LogoProps) {
@@ -23,6 +24,20 @@ export default function Logo({
     md: "text-lg",
     lg: "text-2xl",
   }[size]
+
+  const bharatTextClass =
+    theme === "dark"
+      ? "text-white"
+      : theme === "light"
+      ? "text-[#102A43]"
+      : "text-[#102A43] dark:text-[#F1F4FF]"
+
+  const subTextClass =
+    theme === "dark"
+      ? "text-slate-300"
+      : theme === "light"
+      ? "text-slate-600"
+      : "text-muted-foreground"
 
   return (
     <Link
@@ -91,7 +106,7 @@ export default function Logo({
       {variant === "full" && (
         <div className="flex flex-col leading-tight">
           <div className="flex items-center gap-1.5 font-black tracking-tight text-foreground">
-            <span className={`${textStyles} font-extrabold text-[#102A43] dark:text-[#F1F4FF]`}>
+            <span className={`${textStyles} font-extrabold ${bharatTextClass}`}>
               BharatSign
             </span>
             <span className={`${textStyles} font-black text-[#3B82F6]`}>Bridge</span>
@@ -99,7 +114,7 @@ export default function Logo({
               2.0
             </span>
           </div>
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
+          <span className={`text-[10px] font-semibold uppercase tracking-widest ${subTextClass}`}>
             Indian Sign Language AI
           </span>
         </div>

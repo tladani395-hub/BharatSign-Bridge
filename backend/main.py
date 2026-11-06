@@ -32,7 +32,7 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "bharatsign.db")
 JWT_SECRET = os.getenv("JWT_SECRET", "bharatsign_jwt_super_secure_signing_secret_key_2026_xyz_7788_enterprise_production")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "72"))
-CAPTCHA_SECRET = os.getenv("CAPTCHA_SECRET", "bharatsign_human_auth_verification_salt_2026")
+CAPTCHA_SECRET = os.getenv("CAPTCHA_SECRET") or secrets.token_hex(32)
 ALLOWED_ORIGINS = [
     o.strip()
     for o in os.getenv(
@@ -41,6 +41,9 @@ ALLOWED_ORIGINS = [
     ).split(",")
     if o.strip()
 ]
+
+# Track consumed single-use captcha tokens to prevent replay attacks
+USED_CAPTCHA_TOKENS: set = set()
 
 def generate_captcha_challenge():
     """Generates an accessible, randomized math captcha challenge with cryptographic HMAC signature."""
@@ -58,7 +61,7 @@ def generate_captcha_challenge():
     }
 
 def verify_captcha_challenge(answer: Optional[str], token: Optional[str]) -> bool:
-    """Validates human verification challenge response against cryptographic token."""
+    """Validates single-use human verification challenge response against cryptographic HMAC signature."""
     if not answer or not token:
         return False
     try:
@@ -66,12 +69,21 @@ def verify_captcha_challenge(answer: Optional[str], token: Optional[str]) -> boo
         if len(parts) != 2:
             return False
         timestamp_str, signature = parts
+        # Prevent token replay: tokens are strictly single-use
+        if signature in USED_CAPTCHA_TOKENS:
+            return False
         timestamp = int(timestamp_str)
+        now = time.time()
         # Token valid for 10 minutes (600 seconds)
-        if time.time() - timestamp > 600 or time.time() < timestamp - 60:
+        if now - timestamp > 600 or now < timestamp - 60:
             return False
         expected_sig = hmac.new(CAPTCHA_SECRET.encode(), f"{answer.strip()}:{timestamp_str}".encode(), hashlib.sha256).hexdigest()
-        return hmac.compare_digest(expected_sig, signature)
+        if hmac.compare_digest(expected_sig, signature):
+            USED_CAPTCHA_TOKENS.add(signature)
+            if len(USED_CAPTCHA_TOKENS) > 10000:
+                USED_CAPTCHA_TOKENS.clear()
+            return True
+        return False
     except Exception:
         return False
 
@@ -83,16 +95,20 @@ VERIFY_TOKEN_RATE_LIMIT: Dict[str, List[float]] = {}
 LOGIN_RATE_LIMIT: Dict[str, List[float]] = {}
 
 def check_rate_limit(storage: Dict[str, List[float]], key: str, max_requests: int = 5, window_seconds: int = 900) -> bool:
-    """Sliding window rate limiter to mitigate brute-force and email flooding attacks."""
+    """Checks whether the key has exceeded max_requests in sliding window."""
     now = time.time()
     timestamps = storage.get(key, [])
-    # Discard timestamps outside the current window
     timestamps = [t for t in timestamps if now - t < window_seconds]
-    if len(timestamps) >= max_requests:
-        return False
+    storage[key] = timestamps
+    return len(timestamps) < max_requests
+
+def record_rate_limit_attempt(storage: Dict[str, List[float]], key: str, window_seconds: int = 900):
+    """Records an attempt against a key in sliding window."""
+    now = time.time()
+    timestamps = storage.get(key, [])
+    timestamps = [t for t in timestamps if now - t < window_seconds]
     timestamps.append(now)
     storage[key] = timestamps
-    return True
 
 # ==================== JWT AUTHENTICATION & ACCESS CONTROL ====================
 
@@ -461,25 +477,24 @@ BharatSign Bridge Security Team
                 delivery_status = f"smtp_error: {str(e)}"
                 print(f"[SMTP ERROR] Failed to send email via SMTP to {to_email}: {e}")
 
-    # 4. Record into sent_emails table for guaranteed delivery audit and development testing
+    # 4. Record into sent_emails table for delivery audit without storing sensitive OTPs or raw reset URLs
     try:
+        masked_recipient = f"{to_email[:2]}***@{to_email.split('@')[-1]}" if "@" in to_email else "masked"
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
         INSERT INTO sent_emails (recipient, subject, body_html, body_text, reset_url, status)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """, (to_email.lower(), subject, html_content, text_content, reset_url, delivery_status))
+        VALUES (?, ?, '[REDACTED]', '[REDACTED]', '[REDACTED]', ?)
+        """, (masked_recipient, subject, delivery_status))
         conn.commit()
         conn.close()
     except Exception as e:
-        print("Error recording sent email to database:", e)
+        print("Error recording delivery audit to database:", e)
 
     return {
         "status": delivery_status,
         "recipient": to_email,
-        "subject": subject,
-        "reset_url": reset_url,
-        "otp_code": otp_code
+        "subject": subject
     }
 
 
@@ -634,45 +649,53 @@ def init_db():
     );
     """)
 
-    # Seed Default User if not exists
-    cursor.execute("SELECT COUNT(*) FROM users WHERE email = 'student@bharatsign.ai'")
-    if cursor.fetchone()[0] == 0:
-        default_pwd = hash_password("BharatSign2026!#")
-        cursor.execute("""
-        INSERT INTO users (id, name, email, password_hash, preferred_language, role, streak_days, level, joined_date)
-        VALUES ('user_demo_001', 'ISL Student', 'student@bharatsign.ai', ?, 'en', 'student', 0, 'ISL Beginner • Level 1', 'November 2026')
-        """, (default_pwd,))
-    else:
-        # Ensure role is set
-        cursor.execute("UPDATE users SET role = 'student' WHERE email = 'student@bharatsign.ai' AND (role IS NULL OR role = '')")
+    # Clean up test rows and unwanted fake certificates
+    cursor.execute("DELETE FROM users WHERE name LIKE '%Security Test%' OR name LIKE '%Test User%'")
+    cursor.execute("DELETE FROM certificates WHERE user_name LIKE '%Tirth Ladani%' OR user_name LIKE '%Fake%'")
 
-    # Seed Default Expert Reviewer Account if not exists
-    cursor.execute("SELECT COUNT(*) FROM users WHERE email = 'expert@bharatsign.ai'")
-    if cursor.fetchone()[0] == 0:
-        expert_pwd = hash_password("BharatSignExpert2026!#")
-        cursor.execute("""
-        INSERT INTO users (id, name, email, password_hash, preferred_language, role, streak_days, level, joined_date)
-        VALUES ('user_expert_001', 'Dr. Sunita Sharma (ISLRTC Fellow)', 'expert@bharatsign.ai', ?, 'en', 'expert', 45, 'ISL Master • Level 4', 'November 2026')
-        """, (expert_pwd,))
+    # In production, never auto-seed demo accounts with known credentials
+    is_production = os.getenv("ENVIRONMENT", "development").lower() == "production"
+    should_seed = (not is_production) and os.getenv("SEED_DEMO_USERS", "true").lower() == "true"
 
-    # Seed Default Admin Account if not exists
-    cursor.execute("SELECT COUNT(*) FROM users WHERE email = 'admin@bharatsign.ai'")
-    if cursor.fetchone()[0] == 0:
-        admin_pwd = hash_password("BharatSignAdmin2026!#")
-        cursor.execute("""
-        INSERT INTO users (id, name, email, password_hash, preferred_language, role, streak_days, level, joined_date)
-        VALUES ('user_admin_001', 'System Administrator', 'admin@bharatsign.ai', ?, 'en', 'admin', 99, 'System Admin', 'November 2026')
-        """, (admin_pwd,))
+    if should_seed:
+        # Seed Default User if not exists
+        cursor.execute("SELECT COUNT(*) FROM users WHERE email = 'student@bharatsign.ai'")
+        if cursor.fetchone()[0] == 0:
+            default_pwd = hash_password("BharatSign2026!#")
+            cursor.execute("""
+            INSERT INTO users (id, name, email, password_hash, preferred_language, role, streak_days, level, joined_date)
+            VALUES ('user_demo_001', 'ISL Student (Demo)', 'student@bharatsign.ai', ?, 'en', 'student', 0, 'ISL Beginner • Level 1', 'November 2026')
+            """, (default_pwd,))
+        else:
+            cursor.execute("UPDATE users SET role = 'student' WHERE email = 'student@bharatsign.ai' AND (role IS NULL OR role = '')")
 
-    # Seed default security questions for user_demo_001
-    cursor.execute("SELECT COUNT(*) FROM user_security_questions WHERE user_id = 'user_demo_001'")
-    if cursor.fetchone()[0] == 0:
-        demo_a1_hash = hash_security_answer("delhi public school")
-        demo_a2_hash = hash_security_answer("cricket")
-        cursor.execute("""
-        INSERT INTO user_security_questions (user_id, question_1_id, answer_1_hash, question_2_id, answer_2_hash)
-        VALUES ('user_demo_001', 'q1_school', ?, 'q4_game', ?)
-        """, (demo_a1_hash, demo_a2_hash))
+        # Seed Default Expert Reviewer Account if not exists
+        cursor.execute("SELECT COUNT(*) FROM users WHERE email = 'expert@bharatsign.ai'")
+        if cursor.fetchone()[0] == 0:
+            expert_pwd = hash_password("BharatSignExpert2026!#")
+            cursor.execute("""
+            INSERT INTO users (id, name, email, password_hash, preferred_language, role, streak_days, level, joined_date)
+            VALUES ('user_expert_001', 'Dr. Sunita Sharma (ISLRTC Fellow)', 'expert@bharatsign.ai', ?, 'en', 'expert', 45, 'ISL Master • Level 4', 'November 2026')
+            """, (expert_pwd,))
+
+        # Seed Default Admin Account if not exists
+        cursor.execute("SELECT COUNT(*) FROM users WHERE email = 'admin@bharatsign.ai'")
+        if cursor.fetchone()[0] == 0:
+            admin_pwd = hash_password("BharatSignAdmin2026!#")
+            cursor.execute("""
+            INSERT INTO users (id, name, email, password_hash, preferred_language, role, streak_days, level, joined_date)
+            VALUES ('user_admin_001', 'System Administrator', 'admin@bharatsign.ai', ?, 'en', 'admin', 99, 'System Admin', 'November 2026')
+            """, (admin_pwd,))
+
+        # Seed default security questions for user_demo_001
+        cursor.execute("SELECT COUNT(*) FROM user_security_questions WHERE user_id = 'user_demo_001'")
+        if cursor.fetchone()[0] == 0:
+            demo_a1_hash = hash_security_answer("delhi public school")
+            demo_a2_hash = hash_security_answer("cricket")
+            cursor.execute("""
+            INSERT INTO user_security_questions (user_id, question_1_id, answer_1_hash, question_2_id, answer_2_hash)
+            VALUES ('user_demo_001', 'q1_school', ?, 'q4_game', ?)
+            """, (demo_a1_hash, demo_a2_hash))
 
     # Certificates Table for QR-Verified Credentials (No fake seeded certificates)
     cursor.execute("""
@@ -707,10 +730,15 @@ def init_db():
 
 init_db()
 
+is_production = os.getenv("ENVIRONMENT", "development").lower() == "production"
+
 app = FastAPI(
     title="BharatSign-Bridge AI Backend",
     description="Multilingual Indian Sign Language Translation, Procedural Kinematics, and Gesture Recognition API",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url=None if is_production else "/docs",
+    redoc_url=None if is_production else "/redoc",
+    openapi_url=None if is_production else "/openapi.json"
 )
 
 # Enable CORS for frontend with strictly configured allowed origins (fixes wildcard + credentials vulnerability)
@@ -1125,22 +1153,27 @@ def login_user(req: LoginRequest, request: Request):
     """
     client_ip = request.client.host if request.client else "127.0.0.1"
     clean_email = req.email.strip().lower()
-    rate_key = f"{client_ip}:{clean_email}"
+    ip_key = f"ip:{client_ip}"
+    acc_key = f"acc:{clean_email}"
 
-    # Rate limiting on login (max 6 attempts per 15 minutes per IP/email)
-    if not check_rate_limit(LOGIN_RATE_LIMIT, rate_key, max_requests=6, window_seconds=900):
+    # Rate limiting on login: max 15 failed attempts per IP, max 5 per account
+    if not check_rate_limit(LOGIN_RATE_LIMIT, ip_key, max_requests=15, window_seconds=900) or not check_rate_limit(LOGIN_RATE_LIMIT, acc_key, max_requests=5, window_seconds=900):
         raise HTTPException(
             status_code=429,
-            detail="Too many failed login attempts. Please wait 15 minutes before retrying."
+            detail="Too many failed login attempts. Account temporarily locked for 15 minutes."
         )
 
-    # 1. Human verification check if challenge token provided
-    if req.captcha_token:
-        if not verify_captcha_challenge(req.captcha_answer, req.captcha_token):
-            raise HTTPException(
-                status_code=400,
-                detail="Human verification failed. Please enter the correct answer."
-            )
+    # 1. Human verification check (always mandatory for login)
+    if not req.captcha_token or not req.captcha_answer:
+        raise HTTPException(
+            status_code=400,
+            detail="Human verification is required. Please solve the captcha challenge."
+        )
+    if not verify_captcha_challenge(req.captcha_answer, req.captcha_token):
+        raise HTTPException(
+            status_code=400,
+            detail="Human verification failed or challenge expired. Please enter the correct answer."
+        )
 
     if not clean_email or not req.password:
         raise HTTPException(status_code=400, detail="Email and password are required.")
@@ -1153,6 +1186,8 @@ def login_user(req: LoginRequest, request: Request):
 
     # Generic error without revealing whether email exists
     if not user_row or not verify_password(user_row["password_hash"], req.password.strip()):
+        record_rate_limit_attempt(LOGIN_RATE_LIMIT, ip_key, window_seconds=900)
+        record_rate_limit_attempt(LOGIN_RATE_LIMIT, acc_key, window_seconds=900)
         conn.close()
         raise HTTPException(
             status_code=401,
@@ -1175,7 +1210,7 @@ def login_user(req: LoginRequest, request: Request):
     token = create_access_token(user_data["id"], user_data["email"], user_role)
 
     # Clear failed attempt counter on successful login
-    LOGIN_RATE_LIMIT.pop(rate_key, None)
+    LOGIN_RATE_LIMIT.pop(acc_key, None)
 
     return {
         "status": "success",
@@ -1202,8 +1237,13 @@ def login_user(req: LoginRequest, request: Request):
 def sync_progress(req: SyncProgressRequest, current_user: dict = Depends(get_current_user)):
     """
     Syncs streak and mastered signs back to SQLite database for the AUTHENTICATED user only.
-    Prevents forged progress tampering.
+    Validates numbers server-side and rejects negative values or forged tampering.
     """
+    if req.streak_days < 0 or req.mastered_signs_count < 0 or (req.total_quizzes_taken is not None and req.total_quizzes_taken < 0):
+        raise HTTPException(status_code=400, detail="Progress values cannot be negative.")
+    if req.streak_days > 10000 or req.mastered_signs_count > 10000 or (req.total_quizzes_taken and req.total_quizzes_taken > 10000):
+        raise HTTPException(status_code=400, detail="Progress values exceed realistic bounds.")
+
     user_id = current_user["id"]
     conn = sqlite3.connect(DB_PATH, timeout=10)
     cursor = conn.cursor()
@@ -1211,23 +1251,10 @@ def sync_progress(req: SyncProgressRequest, current_user: dict = Depends(get_cur
     UPDATE users
     SET streak_days = ?, mastered_signs_count = ?, total_quizzes_taken = ?, level = COALESCE(?, level), updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-    """, (max(0, req.streak_days), max(0, req.mastered_signs_count), max(0, req.total_quizzes_taken or 0), req.level, user_id))
+    """, (req.streak_days, req.mastered_signs_count, req.total_quizzes_taken or 0, req.level, user_id))
     conn.commit()
     conn.close()
     return {"status": "success", "message": "Progress synchronized with database for authenticated user."}
-
-@app.get("/api/auth/users")
-def get_registered_users(admin_user: dict = Depends(require_role(["admin"]))):
-    """
-    Admin-only telemetry endpoint. Prevents public enumeration of user names and emails.
-    """
-    conn = sqlite3.connect(DB_PATH, timeout=10)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name, email, streak_days, level, joined_date, role FROM users ORDER BY created_at DESC")
-    rows = cursor.fetchall()
-    conn.close()
-    users = [{"id": r[0], "name": r[1], "email": r[2], "streak_days": r[3], "level": r[4], "joined_date": r[5], "role": r[6]} for r in rows]
-    return {"total_users": len(users), "users": users}
 
 # ==================== PROFILE EDIT & PASSWORD RECOVERY ENDPOINTS ====================
 
@@ -1240,29 +1267,51 @@ class UpdateProfileRequest(BaseModel):
 @app.put("/api/auth/profile")
 def update_user_profile(req: UpdateProfileRequest, current_user: dict = Depends(get_current_user)):
     """
-    Updates profile for the authenticated user only. Prevents arbitrary email profile modification.
+    Updates profile for the authenticated user only.
+    Validates avatar URLs (https/data:image only) and sanitizes text against XSS/HTML injection.
     """
     user_id = current_user["id"]
+
+    # Sanitize and validate name
+    raw_name = req.name.strip() if req.name and req.name.strip() else current_user["name"]
+    clean_name = re.sub(r'<[^>]+>', '', raw_name)[:100].strip() or "Student"
+
+    # Sanitize language
+    new_lang = req.preferred_language if req.preferred_language else current_user["preferred_language"]
+    if new_lang not in INDIAN_LANGUAGES and new_lang != "en":
+        new_lang = "en"
+
+    # Sanitize and validate avatar URL (allow only secure HTTPS, data:image, or local /avatars/)
+    raw_avatar = req.avatar_url if req.avatar_url is not None else current_user.get("avatar_url", "")
+    new_avatar = ""
+    if raw_avatar:
+        raw_avatar = raw_avatar.strip()
+        if raw_avatar.startswith(("https://", "/avatars/")) or re.match(r"^data:image\/(png|jpeg|webp|gif);base64,", raw_avatar):
+            if len(raw_avatar) > 500000:
+                raise HTTPException(status_code=400, detail="Avatar image data exceeds 500KB size limit.")
+            new_avatar = raw_avatar
+        else:
+            raise HTTPException(status_code=400, detail="Invalid avatar URL. Only secure HTTPS or valid image data formats are allowed.")
+
+    # Sanitize and validate bio
+    raw_bio = req.bio if req.bio is not None else current_user.get("bio", "")
+    clean_bio = re.sub(r'<[^>]+>', '', raw_bio)[:500].strip() if raw_bio else ""
+
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-
-    new_name = req.name.strip() if req.name and req.name.strip() else current_user["name"]
-    new_lang = req.preferred_language if req.preferred_language else current_user["preferred_language"]
-    new_avatar = req.avatar_url if req.avatar_url is not None else current_user["avatar_url"]
-    new_bio = req.bio if req.bio is not None else current_user["bio"]
 
     cursor.execute("""
     UPDATE users
     SET name = ?, preferred_language = ?, avatar_url = ?, bio = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-    """, (new_name, new_lang, new_avatar, new_bio, user_id))
+    """, (clean_name, new_lang, new_avatar, clean_bio, user_id))
 
     cursor.execute("""
     UPDATE certificates
     SET user_name = ?
     WHERE user_id = ?
-    """, (new_name, user_id))
+    """, (clean_name, user_id))
 
     conn.commit()
     conn.close()
@@ -1272,7 +1321,7 @@ def update_user_profile(req: UpdateProfileRequest, current_user: dict = Depends(
         "message": "User profile updated successfully.",
         "user": {
             "id": user_id,
-            "name": new_name,
+            "name": clean_name,
             "email": current_user["email"],
             "role": current_user.get("role", "student"),
             "preferredLanguage": new_lang,
@@ -1316,16 +1365,13 @@ def update_user_profile(req: UpdateProfileRequest, current_user: dict = Depends(
 # ==================== SECURITY QUESTIONS & PASSWORD RECOVERY (SECTIONS 1–8) ====================
 
 class SecurityQuestionsSetupRequest(BaseModel):
-    user_id: Optional[str] = None
-    email: Optional[str] = None
+    current_password: str
     question_1_id: str
     answer_1: str
     question_2_id: str
     answer_2: str
 
 class SecurityQuestionsUpdateRequest(BaseModel):
-    user_id: Optional[str] = None
-    email: Optional[str] = None
     current_password: str
     question_1_id: str
     answer_1: str
@@ -1352,32 +1398,16 @@ def get_security_questions_list():
     return {"questions": SECURITY_QUESTIONS_LIST}
 
 @app.get("/api/auth/security-questions/status")
-def get_user_security_questions_status(user_id: Optional[str] = None, email: Optional[str] = None):
+def get_user_security_questions_status(current_user: dict = Depends(get_current_user)):
     """
-    Returns whether security questions are configured for this user and their question labels.
+    Returns whether security questions are configured for the authenticated user and their question labels.
     Never returns answer plaintext or hashes.
     """
-    clean_id = (user_id or "").strip()
-    clean_email = (email or "").strip().lower()
-
-    if not clean_id and not clean_email:
-        raise HTTPException(status_code=400, detail="user_id or email is required.")
-
+    resolved_user_id = current_user["id"]
     conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
     try:
         cursor = conn.cursor()
-
-        resolved_user_id = clean_id
-        if not resolved_user_id and clean_email:
-            cursor.execute("SELECT id FROM users WHERE LOWER(email) = LOWER(?)", (clean_email,))
-            u = cursor.fetchone()
-            if u:
-                resolved_user_id = u["id"]
-
-        if not resolved_user_id:
-            return {"has_security_questions": False}
-
         cursor.execute("SELECT * FROM user_security_questions WHERE user_id = ?", (resolved_user_id,))
         row = cursor.fetchone()
 
@@ -1399,11 +1429,17 @@ def get_user_security_questions_status(user_id: Optional[str] = None, email: Opt
         conn.close()
 
 @app.post("/api/auth/security-questions/setup")
-def setup_security_questions(req: SecurityQuestionsSetupRequest, request: Request):
+def setup_security_questions(req: SecurityQuestionsSetupRequest, request: Request, current_user: dict = Depends(get_current_user)):
     """
     Mandatory setup for user security questions.
-    Enforces two distinct questions, mandatory answers, whitespace trim, case normalization, and bcrypt hashing.
+    Requires a valid authenticated session and verifies current password to prevent account takeover.
     """
+    if not req.current_password or not verify_password(current_user["password_hash"], req.current_password.strip()):
+        raise HTTPException(
+            status_code=401,
+            detail="Password verification failed. You must provide your valid current password to configure recovery questions."
+        )
+
     clean_q1 = req.question_1_id.strip()
     clean_q2 = req.question_2_id.strip()
     ans1 = req.answer_1.strip()
@@ -1418,23 +1454,12 @@ def setup_security_questions(req: SecurityQuestionsSetupRequest, request: Reques
     if len(ans1) < 2 or len(ans2) < 2:
         raise HTTPException(status_code=400, detail="Answers for both security questions are mandatory (minimum 2 characters).")
 
+    target_user_id = current_user["id"]
+
     conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
     try:
         cursor = conn.cursor()
-
-        target_user_id = (req.user_id or "").strip()
-        clean_email = (req.email or "").strip().lower()
-
-        if not target_user_id and clean_email:
-            cursor.execute("SELECT id FROM users WHERE LOWER(email) = LOWER(?)", (clean_email,))
-            u = cursor.fetchone()
-            if u:
-                target_user_id = u["id"]
-
-        if not target_user_id:
-            raise HTTPException(status_code=400, detail="Associated user account could not be found.")
-
         ans1_hash = hash_security_answer(ans1)
         ans2_hash = hash_security_answer(ans2)
 
@@ -1461,7 +1486,7 @@ def setup_security_questions(req: SecurityQuestionsSetupRequest, request: Reques
     }
 
 @app.post("/api/auth/security-questions/update")
-def update_security_questions(req: SecurityQuestionsUpdateRequest, request: Request):
+def update_security_questions(req: SecurityQuestionsUpdateRequest, request: Request, current_user: dict = Depends(get_current_user)):
     """
     Allows authenticated users to modify security questions after verifying their current password.
     """
@@ -1479,33 +1504,14 @@ def update_security_questions(req: SecurityQuestionsUpdateRequest, request: Requ
     if len(ans1) < 2 or len(ans2) < 2:
         raise HTTPException(status_code=400, detail="Both answers are mandatory.")
 
+    target_user_id = current_user["id"]
+    if not req.current_password or not verify_password(current_user["password_hash"], req.current_password.strip()):
+        raise HTTPException(status_code=401, detail="Incorrect current password. Password verification is required to update security questions.")
+
     conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
     try:
         cursor = conn.cursor()
-
-        target_user_id = (req.user_id or "").strip()
-        clean_email = (req.email or "").strip().lower()
-
-        if not target_user_id and clean_email:
-            cursor.execute("SELECT id, password_hash FROM users WHERE LOWER(email) = LOWER(?)", (clean_email,))
-            u = cursor.fetchone()
-            if u:
-                target_user_id = u["id"]
-                stored_pwd = u["password_hash"]
-            else:
-                stored_pwd = None
-        else:
-            cursor.execute("SELECT id, password_hash FROM users WHERE id = ?", (target_user_id,))
-            u = cursor.fetchone()
-            stored_pwd = u["password_hash"] if u else None
-
-        if not target_user_id or not stored_pwd:
-            raise HTTPException(status_code=404, detail="User account not found.")
-
-        if not verify_password(stored_pwd, req.current_password.strip()):
-            raise HTTPException(status_code=401, detail="Incorrect current password. Password verification is required to update security questions.")
-
         ans1_hash = hash_security_answer(ans1)
         ans2_hash = hash_security_answer(ans2)
 
@@ -1723,8 +1729,8 @@ def verify_security_answers(req: VerifySecurityAnswersRequest, request: Request)
 
         cursor.execute("""
         INSERT INTO password_resets (user_id, email, token_hash, token, otp_code, expires_at, used)
-        VALUES (?, ?, ?, ?, '', ?, 0)
-        """, (user_id, chal_row["email"], token_hash, reset_token, expires_at))
+        VALUES (?, ?, ?, '', '', ?, 0)
+        """, (user_id, chal_row["email"], token_hash, expires_at))
 
         conn.commit()
     finally:
@@ -1767,9 +1773,9 @@ def verify_reset_token(token: str, request: Request):
         cursor = conn.cursor()
         cursor.execute("""
         SELECT * FROM password_resets
-        WHERE (token_hash = ? OR token = ?)
+        WHERE token_hash = ?
         ORDER BY id DESC LIMIT 1
-        """, (token_hash, clean_token))
+        """, (token_hash,))
         reset_row = cursor.fetchone()
     finally:
         conn.close()
@@ -1829,9 +1835,9 @@ def reset_password_submit(req: ResetPasswordRequest, request: Request):
         # 3. Verify single-use token authorization
         cursor.execute("""
         SELECT * FROM password_resets
-        WHERE (token_hash = ? OR token = ?) AND used = 0 AND expires_at > ?
+        WHERE token_hash = ? AND used = 0 AND expires_at > ?
         ORDER BY id DESC LIMIT 1
-        """, (token_hash, clean_token, now_ts))
+        """, (token_hash, now_ts))
         reset_row = cursor.fetchone()
 
         if not reset_row:
@@ -2011,15 +2017,30 @@ def verify_certificate(cert_id: str):
             detail=f"Certificate ID '{cert_id}' was not found in the BharatSign National Registry."
         )
 
+    public_cert = {
+        "cert_id": row["cert_id"],
+        "user_id": row["user_id"],
+        "user_name": row["user_name"],
+        "streak_days": row["streak_days"],
+        "mastered_signs_count": row["mastered_signs_count"],
+        "total_quizzes_taken": row["total_quizzes_taken"],
+        "issued_at": row["issued_at"],
+        "verification_hash": row["verification_hash"],
+        "status": row["status"]
+    }
+
     return {
         "status": "verified",
         "verified": True,
-        "certificate": dict(row)
+        "certificate": public_cert
     }
 
 @app.get("/api/certificates/user/{email}")
-def get_user_certificate(email: str):
-    """Fetches user certificate by email."""
+def get_user_certificate(email: str, current_user: dict = Depends(get_current_user)):
+    """Fetches user certificate for the authenticated account owner only."""
+    if current_user["email"].lower() != email.strip().lower():
+        raise HTTPException(status_code=403, detail="Forbidden. You may only access your own certificate.")
+
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -2321,6 +2342,35 @@ def get_tts_audio(text: str, lang: str = "en"):
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"TTS service unavailable: {e}")
 
+@app.get("/api/leaderboard")
+def get_leaderboard():
+    """Returns top student leaderboard entries without leaking email addresses or hashes."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT id, name, streak_days, mastered_signs_count, role, created_at, avatar_url
+            FROM users
+            ORDER BY streak_days DESC, mastered_signs_count DESC
+            LIMIT 50
+        """)
+        rows = cursor.fetchall()
+        users_list = []
+        for r in rows:
+            users_list.append({
+                "id": r["id"],
+                "name": r["name"],
+                "streak_days": r["streak_days"],
+                "mastered_signs": r["mastered_signs_count"],
+                "level": f"ISL Practitioner • Level {max(1, min(5, (r['mastered_signs_count'] // 10) + 1))}",
+                "avatar_url": r["avatar_url"],
+                "joined_date": r["created_at"][:10] if r["created_at"] else "2026",
+            })
+        return {"users": users_list}
+    finally:
+        conn.close()
+
 @app.post("/api/translate")
 def translate_text(req: TranslationRequest):
     text = req.text.strip()
@@ -2355,7 +2405,14 @@ def translate_text(req: TranslationRequest):
             break
 
     if not matched_item:
-        matched_item = DICTIONARY_ITEMS[0]  # default fallback
+        return {
+            "status": "no_match",
+            "matched": False,
+            "source_text": text,
+            "source_language": req.source_language,
+            "target_language": req.target_language,
+            "detail": "No direct matching sign found in ISL lexicon. Try fingerspelling or individual keywords."
+        }
 
     # Generate ISL Grammatical Breakdown
     words = text.split()

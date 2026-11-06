@@ -15,11 +15,12 @@ import { Button } from "@/components/ui/button"
 import QRCode from "qrcode"
 import Logo from "@/components/brand/Logo"
 import { downloadCertificatePNG } from "@/lib/certificateGenerator"
+import { API_BASE_URL } from "@/config/api"
 
 interface CertificateData {
   cert_id: string
   user_name: string
-  user_email: string
+  user_email?: string
   streak_days: number
   mastered_signs_count: number
   total_quizzes_taken: number
@@ -43,41 +44,29 @@ export default function VerifyCertificate() {
       setLoading(true)
       setError(null)
       try {
-        const res = await fetch(`http://127.0.0.1:8000/api/certificates/${activeCertId}`)
+        const res = await fetch(`${API_BASE_URL}/api/certificates/${activeCertId}`)
         if (res.ok) {
           const data = await res.json()
           setCertData(data.certificate)
         } else {
           // If not in database, check for demo cert or show not found
-          if (activeCertId === "BSB-2026-1047") {
+          if (activeCertId === "BSB-2026-1047" || activeCertId === "BSB-DEMO-SAMPLE") {
             setCertData({
-              cert_id: "BSB-2026-1047",
-              user_name: "Tirth Ladani",
-              user_email: "student@bharatsign.ai",
+              cert_id: activeCertId,
+              user_name: "Demo Student Preview",
               streak_days: 7,
               mastered_signs_count: 24,
               total_quizzes_taken: 5,
               issued_at: "Nov 04, 2026",
-              verification_hash: "SHA256:7e91a0b3f81c94",
-              status: "VERIFIED",
+              verification_hash: "SHA256:demo_sample_hash",
+              status: "DEMO_PREVIEW",
             })
           } else {
-            setError(`Certificate ID '${activeCertId}' could not be verified in the National Registry.`)
+            setError(`Certificate ID '${activeCertId}' could not be verified in the BharatSign Registry.`)
           }
         }
       } catch {
-        // Fallback for demo
-        setCertData({
-          cert_id: activeCertId,
-          user_name: "Tirth Ladani",
-          user_email: "student@bharatsign.ai",
-          streak_days: 7,
-          mastered_signs_count: 24,
-          total_quizzes_taken: 5,
-          issued_at: "Nov 04, 2026",
-          verification_hash: "SHA256:7e91a0b3f81c94",
-          status: "VERIFIED",
-        })
+        setError(`Unable to connect to registry server. Please check your connection and retry.`)
       } finally {
         setLoading(false)
       }

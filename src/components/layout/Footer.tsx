@@ -14,7 +14,7 @@ export default function Footer() {
             </p>
             <div className="flex items-center gap-2 text-xs text-emerald-400 font-mono">
               <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>FastAPI Backend Active (127.0.0.1:8000)</span>
+              <span>FastAPI Neural Core Active</span>
             </div>
           </div>
 

@@ -380,7 +380,7 @@ export default function Settings({ currentLanguage, onLanguageChange }: Settings
                               className="h-5 w-5 rounded-full border border-white/20 shrink-0 shadow-sm"
                               style={{ backgroundColor: pal.preview }}
                             />
-                            <span className="text-xs text-foreground truncate">{pal.label}</span>
+                            <span className="text-xs text-foreground whitespace-normal text-left leading-tight">{pal.label}</span>
                           </button>
                         )
                       })}
@@ -415,7 +415,7 @@ export default function Settings({ currentLanguage, onLanguageChange }: Settings
                               className="h-5 w-5 rounded-full border border-white/30 shrink-0 shadow-sm"
                               style={{ backgroundColor: tone.preview }}
                             />
-                            <span className="text-xs text-foreground truncate">{tone.label}</span>
+                            <span className="text-xs text-foreground whitespace-normal text-left leading-tight">{tone.label}</span>
                           </button>
                         )
                       })}

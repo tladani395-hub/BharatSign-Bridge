@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react"
+import { API_BASE_URL } from "@/config/api"
 
 export interface UserProfile {
   id: string
@@ -113,7 +114,7 @@ export function AuthAndThemeProvider({ children }: { children: React.ReactNode }
       if (token) {
         headers["Authorization"] = `Bearer ${token}`
       }
-      fetch("http://127.0.0.1:8000/api/auth/sync-progress", {
+      fetch(`${API_BASE_URL}/api/auth/sync-progress`, {
         method: "POST",
         headers,
         body: JSON.stringify({

@@ -1,5 +1,6 @@
 // Universal Multilingual Speech Synthesis and Recognition Library
 // Supporting all 13 Indian Languages + Fallbacks
+import { API_BASE_URL } from "@/config/api"
 
 export interface IndicLanguage {
   code: string
@@ -160,7 +161,7 @@ export function speakText(
 
   // 1. Try High-Quality Backend Audio TTS (guarantees native accent for all 13 languages)
   try {
-    const ttsUrl = `http://127.0.0.1:8000/api/tts?text=${encodeURIComponent(sanitizedText)}&lang=${encodeURIComponent(langCode)}`
+    const ttsUrl = `${API_BASE_URL}/api/tts?text=${encodeURIComponent(sanitizedText)}&lang=${encodeURIComponent(langCode)}`
     const audio = new Audio(ttsUrl)
     currentAudioElement = audio
 

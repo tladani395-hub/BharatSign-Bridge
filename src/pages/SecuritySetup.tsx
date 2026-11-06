@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAuthAndTheme } from "@/context/AuthAndThemeContext"
+import { API_BASE_URL } from "@/config/api"
 
 interface QuestionOption {
   id: string
@@ -38,6 +39,9 @@ export default function SecuritySetup() {
   const [answer2, setAnswer2] = useState("")
   const [showAnswer2, setShowAnswer2] = useState(false)
 
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+
   const [submitting, setSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [hasErrorShake, setHasErrorShake] = useState(false)
@@ -53,7 +57,7 @@ export default function SecuritySetup() {
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/auth/security-questions/list")
+        const res = await fetch(`${API_BASE_URL}/api/auth/security-questions/list`)
         const data = await res.json()
         if (data.questions && data.questions.length > 0) {
           setQuestions(data.questions)
@@ -72,6 +76,11 @@ export default function SecuritySetup() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMsg(null)
+
+    if (!currentPassword) {
+      triggerError("Please confirm your current password to secure your account.")
+      return
+    }
 
     if (question1Id === question2Id) {
       triggerError("Please select two different security questions.")
@@ -94,12 +103,15 @@ export default function SecuritySetup() {
     setSubmitting(true)
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/auth/security-questions/setup", {
+      const token = localStorage.getItem("bharatsign_token")
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) headers["Authorization"] = `Bearer ${token}`
+
+      const res = await fetch(`${API_BASE_URL}/api/auth/security-questions/setup`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
-          user_id: user?.id || "",
-          email: user?.email || "",
+          current_password: currentPassword,
           question_1_id: question1Id,
           answer_1: cleanAns1,
           question_2_id: question2Id,
@@ -282,6 +294,38 @@ export default function SecuritySetup() {
                   <span>
                     Choose answers you can remember easily, but that others cannot guess or find online.
                   </span>
+                </div>
+
+                {/* CURRENT PASSWORD CONFIRMATION */}
+                <div className="flex flex-col gap-2 p-3.5 rounded-2xl bg-[#f3f5fb] dark:bg-[#151b36] border border-[#d8e0f2] dark:border-[#222b4a]">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="current-pwd" className="text-xs font-bold text-[#0e1430] dark:text-[#eef1ff] flex items-center gap-1.5">
+                      <Lock className="h-3.5 w-3.5 text-[#2f4bff]" />
+                      <span>Confirm Your Current Password</span>
+                    </Label>
+                    <span className="text-[10.5px] text-[#586082] dark:text-[#828bb4]">Required for security</span>
+                  </div>
+                  <div className="relative mt-1">
+                    <Input
+                      id="current-pwd"
+                      type={showCurrentPassword ? "text" : "password"}
+                      required
+                      value={currentPassword}
+                      onChange={(e) => {
+                        setCurrentPassword(e.target.value)
+                        setErrorMsg(null)
+                      }}
+                      placeholder="Enter your account password to confirm identity"
+                      className="pr-10 h-10 rounded-xl bg-white dark:bg-[#0e1328] border-[#d8e0f2] dark:border-[#2a3458] text-xs font-semibold focus:ring-2 focus:ring-[#2f4bff]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#586082] dark:text-[#828bb4] hover:text-[#0e1430] dark:hover:text-white p-1"
+                    >
+                      {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 {/* QUESTION 1 */}

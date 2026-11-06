@@ -681,7 +681,7 @@ export default function ExpertReview() {
                       <td className="py-3 px-3 font-mono font-bold text-cyan-400">
                         {rec.gloss}
                       </td>
-                      <td className="py-3 px-3 font-medium text-foreground">
+                      <td className="py-3 px-3 font-medium text-foreground whitespace-nowrap">
                         {rec.reviewer_name}
                       </td>
                       <td className="py-3 px-3">
@@ -746,19 +746,19 @@ export default function ExpertReview() {
                 <Award className="h-9 w-9" />
               </div>
               <span className="text-[11px] font-bold tracking-widest uppercase text-emerald-400">
-                National Sign Language Linguistic Council
+                Independent ISL Community Peer Review Panel
               </span>
               <h2 className="text-2xl font-black tracking-tight text-foreground">
-                ISLRTC Compliance Certification
+                ISL Lexical Alignment & Peer Review Record
               </h2>
               <p className="text-xs text-muted-foreground max-w-md">
-                Government of India • Ministry of Social Justice & Empowerment Alignment
+                Open-Source AI Research Project • Aligned with ISLRTC Lexicon Guidelines (Not an Official Endorsement)
               </p>
             </div>
 
             {/* Certificate Body */}
             <div className="space-y-4 text-center px-4">
-              <p className="text-xs text-muted-foreground">This is to officially certify that the BharatSign-Bridge AI sign vocabulary has undergone human evaluation and linguistic audit under authentic Indian Sign Language parameters.</p>
+              <p className="text-xs text-muted-foreground">This peer review audit verifies that selected gestures in the BharatSign Bridge dictionary have been examined by community evaluators against authentic Indian Sign Language parameters.</p>
 
               <div className="grid grid-cols-3 gap-3 py-3 border-y border-border text-center">
                 <div className="p-3 rounded-2xl bg-muted/60">
@@ -766,12 +766,14 @@ export default function ExpertReview() {
                   <span className="text-xl font-black text-emerald-400">{validatedCount}</span>
                 </div>
                 <div className="p-3 rounded-2xl bg-muted/60">
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold block">Compliance Index</span>
-                  <span className="text-xl font-black text-cyan-400">99.4%</span>
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold block">Approval Ratio</span>
+                  <span className="text-xl font-black text-cyan-400">
+                    {Math.round((validatedCount / Math.max(1, VOCABULARY_SIGNS.length)) * 100)}%
+                  </span>
                 </div>
                 <div className="p-3 rounded-2xl bg-muted/60">
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold block">Audit Standard</span>
-                  <span className="text-xl font-black text-amber-400">ISLRTC 2026</span>
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold block">Lexicon Standard</span>
+                  <span className="text-xl font-black text-amber-400">ISLRTC Aligned</span>
                 </div>
               </div>
 

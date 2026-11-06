@@ -109,8 +109,8 @@ export default function Home({ currentLanguage, onLanguageChange }: HomeProps) {
                   <span className="text-[11px] text-muted-foreground">ML Inference</span>
                 </div>
                 <div className="p-3 rounded-2xl bg-card/60 backdrop-blur-md border border-purple-500/30 shadow-sm flex flex-col">
-                  <span className="text-2xl font-black text-purple-400">10,000+</span>
-                  <span className="text-[11px] text-muted-foreground">ISLRTC Signs</span>
+                  <span className="text-2xl font-black text-purple-400">50+</span>
+                  <span className="text-[11px] text-muted-foreground">Core ISLRTC Signs</span>
                 </div>
               </div>
             </div>

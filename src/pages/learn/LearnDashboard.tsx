@@ -23,17 +23,17 @@ export default function LearnDashboard() {
         <Breadcrumbs items={[{ label: "Learning Portal" }]} />
 
         {/* Hero Banner */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-primary/30 to-slate-900 border border-border p-8 shadow-2xl">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-border p-8 shadow-2xl text-white">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             <div className="lg:col-span-7 flex flex-col gap-4">
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/20 px-3 py-1 text-xs font-semibold text-primary border border-primary/30 self-start">
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/20 px-3 py-1 text-xs font-semibold text-cyan-300 border border-primary/30 self-start">
                 <Sparkles className="h-3.5 w-3.5" />
                 <span>Interactive ISL Curriculum</span>
               </div>
-              <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-foreground">
+              <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white">
                 Master Indian Sign Language with 3D AI Avatars
               </h1>
-              <p className="text-sm sm:text-base text-muted-foreground max-w-xl leading-relaxed">
+              <p className="text-sm sm:text-base text-slate-300 max-w-xl leading-relaxed">
                 Step-by-step interactive lessons following the official ISLRTC & MSJE curriculum. Practice finger spelling, numbers, and vocabulary with instant AI camera feedback.
               </p>
 

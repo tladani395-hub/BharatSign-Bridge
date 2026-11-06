@@ -31,7 +31,7 @@ const QUIZ_QUESTIONS: QuizQuestion[] = [
     correctAnswer: "A",
     options: ["A", "E", "S", "T"],
     explanation:
-      "Letter A uses both hands: the left open palm is held upright while the right index finger touches the tip of the left thumb.",
+      "Letter A uses both hands: both hands form fists with thumbs pointing vertically upright, touching side-by-side at chest level (ISLRTC Standard).",
   },
   {
     id: 2,

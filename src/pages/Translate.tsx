@@ -181,10 +181,20 @@ function parseTextToTokens(text: string): SignToken[] {
     "نہیں"
   ]
 
+  const ISL_STOP_WORDS = new Set([
+    "TO", "THE", "IS", "ARE", "AM", "A", "AN", "OF", "FOR", "IN", "ON", "AT", "BY", "AND", "IT",
+    "KA", "KE", "KI", "KO", "SE", "MEIN", "PAR", "HAI", "HEIN"
+  ])
+
   for (const raw of rawWords) {
     const cleanWord = raw.replace(/[.,/#!$%^&*;:{}=\-_`~()?"'<>]/g, "").trim()
     if (!cleanWord) continue
     const wUpper = cleanWord.toUpperCase()
+
+    // Skip grammatical stop words in sign language
+    if (ISL_STOP_WORDS.has(wUpper)) {
+      continue
+    }
 
     // Single digits
     if (/^[0-9]$/.test(wUpper)) {
@@ -274,9 +284,11 @@ function parseTextToTokens(text: string): SignToken[] {
         duration: 1.1,
       })
     } else {
-      // Latin letters: fingerspell character by character
+      // Latin letters: fingerspell pronounceable words only (reject keyboard mashing)
       const asciiOnly = cleanWord.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()
-      if (asciiOnly.length > 0) {
+      const isMashing = asciiOnly.length > 7 && !/[AEIOUY]/.test(asciiOnly)
+
+      if (asciiOnly.length > 0 && !isMashing && asciiOnly.length <= 12) {
         for (const char of asciiOnly) {
           if (/^[A-Z]$/.test(char)) {
             result.push({
@@ -289,30 +301,11 @@ function parseTextToTokens(text: string): SignToken[] {
             })
           }
         }
-      } else {
-        // Indic custom word token representation
-        result.push({
-          id: String(idCounter++),
-          word: raw,
-          gloss: `WORD [${cleanWord}]`,
-          gesture: "HELLO",
-          duration: 1.2,
-        })
       }
     }
   }
 
-  return result.length > 0
-    ? result
-    : [
-        {
-          id: "1",
-          word: "Namaste",
-          gloss: "NAMASTE",
-          gesture: "NAMASTE",
-          duration: 1.3,
-        },
-      ]
+  return result
 }
 
 export default function Translate({ currentLanguage, onLanguageChange }: TranslateProps) {
@@ -514,30 +507,36 @@ export default function Translate({ currentLanguage, onLanguageChange }: Transla
                 </div>
 
                 <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto p-2 rounded-xl bg-slate-950/60 border border-border">
-                  {tokens.map((tok, idx) => {
-                    const isActive = activeTokenIndex === idx
-                    return (
-                      <button
-                        key={tok.id}
-                        onClick={() => {
-                          setActiveTokenIndex(idx)
-                          setIsPlaying(false)
-                        }}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1 ${
-                          isActive
-                            ? "bg-primary text-white scale-105 shadow-md ring-2 ring-primary/40"
-                            : tok.isFingerspelled
-                            ? "bg-cyan-950/40 text-cyan-300 border border-cyan-800/60 hover:bg-cyan-900/60"
-                            : "bg-muted text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        <span>{tok.gloss}</span>
-                        {tok.isFingerspelled && (
-                          <span className="text-[8px] opacity-75 font-sans">(FS)</span>
-                        )}
-                      </button>
-                    )
-                  })}
+                  {tokens.length === 0 ? (
+                    <div className="w-full py-4 text-center text-xs text-amber-400">
+                      No matching ISL signs found for input. Try keywords (e.g. 'Namaste', 'Water', 'Help', numbers, or words to fingerspell).
+                    </div>
+                  ) : (
+                    tokens.map((tok, idx) => {
+                      const isActive = activeTokenIndex === idx
+                      return (
+                        <button
+                          key={tok.id}
+                          onClick={() => {
+                            setActiveTokenIndex(idx)
+                            setIsPlaying(false)
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1 ${
+                            isActive
+                              ? "bg-primary text-white scale-105 shadow-md ring-2 ring-primary/40"
+                              : tok.isFingerspelled
+                              ? "bg-cyan-950/40 text-cyan-300 border border-cyan-800/60 hover:bg-cyan-900/60"
+                              : "bg-muted text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <span>{tok.gloss}</span>
+                          {tok.isFingerspelled && (
+                            <span className="text-[8px] opacity-75 font-sans">(FS)</span>
+                          )}
+                        </button>
+                      )
+                    })
+                  )}
                 </div>
               </div>
             </div>

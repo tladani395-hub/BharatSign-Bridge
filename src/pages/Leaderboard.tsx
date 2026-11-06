@@ -14,11 +14,12 @@ import {
 import { Button } from "@/components/ui/button"
 import { useAuthAndTheme } from "@/context/AuthAndThemeContext"
 import Breadcrumbs from "@/components/layout/Breadcrumbs"
+import { API_BASE_URL } from "@/config/api"
 
 interface LeaderboardUser {
   id: string
   name: string
-  email: string
+  email?: string
   streak_days: number
   mastered_signs?: number
   level: string
@@ -38,7 +39,7 @@ export default function Leaderboard() {
     const fetchUsers = async () => {
       setLoading(true)
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/auth/users")
+        const res = await fetch(`${API_BASE_URL}/api/leaderboard`)
         if (res.ok) {
           const data = await res.json()
           let dbUsers: LeaderboardUser[] = data.users || []
@@ -86,17 +87,17 @@ export default function Leaderboard() {
             },
           ]
 
-          // Merge without duplicate emails
-          const existingEmails = new Set(dbUsers.map((u) => u.email.toLowerCase()))
+          // Merge without duplicate IDs
+          const existingIds = new Set(dbUsers.map((u) => u.id))
           benchmarks.forEach((b) => {
-            if (!existingEmails.has(b.email.toLowerCase())) {
+            if (!existingIds.has(b.id)) {
               dbUsers.push(b)
             }
           })
 
           // Ensure current user is in list with latest live stats
           if (user) {
-            const idx = dbUsers.findIndex((u) => u.email.toLowerCase() === user.email.toLowerCase())
+            const idx = dbUsers.findIndex((u) => u.id === user.id || (u.email && user.email && u.email.toLowerCase() === user.email.toLowerCase()))
             const currentUserObj: LeaderboardUser = {
               id: user.id,
               name: user.name,
@@ -138,15 +139,15 @@ export default function Leaderboard() {
   const filteredUsers = sortedUsers.filter(
     (u) =>
       u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.level.toLowerCase().includes(searchQuery.toLowerCase())
+      u.level.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (u.email && u.email.toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
   const top1 = sortedUsers[0]
   const top2 = sortedUsers[1]
   const top3 = sortedUsers[2]
 
-  const userRank = user ? sortedUsers.findIndex((u) => u.email.toLowerCase() === user.email.toLowerCase()) + 1 : null
+  const userRank = user ? sortedUsers.findIndex((u) => u.id === user.id || (u.email && user.email && u.email.toLowerCase() === user.email.toLowerCase())) + 1 : null
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-card/30 to-background py-8 px-4 sm:px-6 lg:px-8">
@@ -334,8 +335,8 @@ export default function Leaderboard() {
                   </tr>
                 ) : (
                   filteredUsers.map((learner, idx) => {
-                    const isMe = user && learner.email.toLowerCase() === user.email.toLowerCase()
-                    const rank = sortedUsers.findIndex((u) => u.email.toLowerCase() === learner.email.toLowerCase()) + 1
+                    const isMe = Boolean(user && (learner.id === user.id || (learner.email && user.email && learner.email.toLowerCase() === user.email.toLowerCase())))
+                    const rank = sortedUsers.findIndex((u) => u.id === learner.id) + 1
 
                     return (
                       <tr

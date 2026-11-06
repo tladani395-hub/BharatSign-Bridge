@@ -31,7 +31,7 @@ export const GESTURE_DATABASE: Record<string, GestureResult> = {
     id: "HELLO",
     name: "Hello / Greeting",
     gloss: "HELLO",
-    confidence: 0.995,
+    confidence: 0.68,
     description: "Dominant hand raised near temple/forehead, waving outward with a welcoming smile.",
     isTwoHanded: false,
     translations: {
@@ -54,7 +54,7 @@ export const GESTURE_DATABASE: Record<string, GestureResult> = {
     id: "NAMASTE",
     name: "Namaste / Pranam",
     gloss: "NAMASTE",
-    confidence: 0.996,
+    confidence: 0.76,
     description: "Traditional Indian greeting with both palms pressed flat together at sternum with head nod.",
     isTwoHanded: true,
     translations: {
@@ -77,7 +77,7 @@ export const GESTURE_DATABASE: Record<string, GestureResult> = {
     id: "THANK_YOU",
     name: "Thank You / Gratitude",
     gloss: "THANK-YOU",
-    confidence: 0.988,
+    confidence: 0.65,
     description: "Fingertips of dominant hand touch chin, then open outward toward recipient with a smile.",
     isTwoHanded: false,
     translations: {
@@ -397,8 +397,8 @@ export const GESTURE_DATABASE: Record<string, GestureResult> = {
     id: "LETTER_A",
     name: "Alphabet A (Two-Handed)",
     gloss: "LETTER A",
-    confidence: 0.992,
-    description: "Left open palm held upright; right index finger touches the tip of left thumb (ISLRTC Standard).",
+    confidence: 0.52,
+    description: "Both hands form fists with thumbs pointing vertically upright, touching side-by-side at chest level (ISLRTC Standard).",
     isTwoHanded: true,
     translations: { en: "Alphabet A", hi: "अक्षर A", gu: "અક્ષર A", mr: "अक्षर A", bn: "অক্ষর A", ta: "எழுத்து A", te: "అక్షరం A" },
   },
@@ -534,7 +534,15 @@ export default function CameraTranslator({
       })
       if (videoRef.current) {
         videoRef.current.srcObject = stream
-        videoRef.current.play()
+        try {
+          await videoRef.current.play()
+        } catch (playErr: any) {
+          if (playErr?.name !== "AbortError") {
+            videoRef.current.onloadedmetadata = () => {
+              videoRef.current?.play().catch(() => {})
+            }
+          }
+        }
         setIsCameraActive(true)
       }
     } catch (err: unknown) {

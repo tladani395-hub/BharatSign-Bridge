@@ -86,10 +86,10 @@ export default function Navbar({ currentLanguage, onLanguageChange }: NavbarProp
         <Logo variant="full" size="md" />
 
         {/* Center: Desktop Navigation Bar */}
-        <nav className="hidden lg:flex items-center gap-1.5 text-xs font-semibold">
+        <nav className="hidden lg:flex items-center gap-0.5 xl:gap-1 text-[11.5px] xl:text-xs font-semibold">
           <Link
             to="/"
-            className={`px-3 py-2 rounded-lg transition-colors ${
+            className={`px-2.5 py-1.5 xl:px-3 xl:py-2 rounded-lg transition-colors ${
               isActive("/")
                 ? "bg-primary/10 text-primary font-bold"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
@@ -386,11 +386,33 @@ export default function Navbar({ currentLanguage, onLanguageChange }: NavbarProp
             </button>
 
             {langPickerOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-56 max-h-80 overflow-y-auto rounded-xl border border-border bg-card p-1.5 shadow-2xl z-50 animate-in fade-in">
-                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border mb-1">
-                  AI Voice Spoken Language
+              <div className="absolute right-0 top-full mt-1.5 w-60 max-h-80 overflow-y-auto rounded-xl border border-border bg-card p-1.5 shadow-2xl z-50 animate-in fade-in">
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400 border-b border-border mb-1">
+                  Full UI + Voice (3)
                 </div>
-                {INDIC_LANGUAGES.map((lang) => (
+                {INDIC_LANGUAGES.filter((l) => ["en", "hi", "gu"].includes(l.code)).map((lang) => (
+                  <button
+                    key={lang.code}
+                    onClick={() => {
+                      onLanguageChange(lang.code)
+                      setLangPickerOpen(false)
+                      speakText(lang.native, lang.code)
+                    }}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold text-left transition-colors ${
+                      currentLanguage === lang.code
+                        ? "bg-primary text-white"
+                        : "text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <span>{lang.native}</span>
+                    <span className="text-[10px] opacity-75">{lang.name}</span>
+                  </button>
+                ))}
+
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-400 border-y border-border mt-1.5 mb-1">
+                  Voice & Sign Dictionary (10)
+                </div>
+                {INDIC_LANGUAGES.filter((l) => !["en", "hi", "gu"].includes(l.code)).map((lang) => (
                   <button
                     key={lang.code}
                     onClick={() => {
@@ -416,7 +438,7 @@ export default function Navbar({ currentLanguage, onLanguageChange }: NavbarProp
           {isAuthenticated ? (
             <Link
               to="/profile"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/15 to-primary/15 border border-amber-500/30 text-xs font-extrabold text-foreground hover:bg-amber-500/25 transition-all shadow-sm group"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/15 to-primary/15 border border-amber-500/30 text-xs font-extrabold text-foreground hover:bg-amber-500/25 transition-all shadow-sm group min-h-[40px]"
               title="View Learning Streak & Profile"
             >
               <Flame className="h-4 w-4 fill-amber-400 text-amber-400 animate-bounce" />
@@ -428,7 +450,7 @@ export default function Navbar({ currentLanguage, onLanguageChange }: NavbarProp
           ) : (
             <Link
               to="/auth"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-white text-xs font-extrabold hover:bg-primary/90 transition-all shadow-md shadow-primary/20 active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-white text-xs font-extrabold hover:bg-primary/90 transition-all shadow-md shadow-primary/20 active:scale-95 min-h-[40px]"
             >
               <UserIcon className="h-3.5 w-3.5" />
               <span>Sign In</span>
@@ -437,7 +459,7 @@ export default function Navbar({ currentLanguage, onLanguageChange }: NavbarProp
 
           <Link
             to="/settings"
-            className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+            className="hidden md:flex p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors min-h-[40px] min-w-[40px] items-center justify-center"
             aria-label="Platform Settings"
           >
             <SettingsIcon className="h-4 w-4" />
@@ -446,7 +468,7 @@ export default function Navbar({ currentLanguage, onLanguageChange }: NavbarProp
           {/* Mobile Hamburger Toggle */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-2 rounded-lg text-foreground hover:bg-muted transition-colors"
+            className="lg:hidden p-2 rounded-xl text-foreground hover:bg-muted transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Toggle Navigation Menu"
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}

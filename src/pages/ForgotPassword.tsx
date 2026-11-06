@@ -17,6 +17,7 @@ import Logo from "@/components/brand/Logo"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { API_BASE_URL } from "@/config/api"
 
 interface ChallengeQuestion {
   id: string
@@ -64,7 +65,7 @@ export default function ForgotPassword() {
 
     setLoading(true)
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/auth/forgot-password/initiate", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password/initiate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: cleanEmail }),
@@ -100,7 +101,7 @@ export default function ForgotPassword() {
 
     setLoading(true)
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/auth/forgot-password/verify-answers", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password/verify-answers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

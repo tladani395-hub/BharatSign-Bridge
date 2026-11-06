@@ -19,6 +19,7 @@ import Logo from "@/components/brand/Logo"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { API_BASE_URL } from "@/config/api"
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams()
@@ -59,7 +60,7 @@ export default function ResetPassword() {
       setVerifying(true)
       try {
         const res = await fetch(
-          `http://127.0.0.1:8000/api/auth/verify-reset-token?token=${encodeURIComponent(token)}`
+          `${API_BASE_URL}/api/auth/verify-reset-token?token=${encodeURIComponent(token)}`
         )
         const data = await res.json()
         if (!res.ok) {
@@ -125,7 +126,7 @@ export default function ResetPassword() {
 
     setSubmitting(true)
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/auth/reset-password", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

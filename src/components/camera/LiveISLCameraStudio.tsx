@@ -1353,7 +1353,15 @@ export default function LiveISLCameraStudio({
       const stream = await navigator.mediaDevices.getUserMedia(constraints)
       if (videoRef.current) {
         videoRef.current.srcObject = stream
-        await videoRef.current.play()
+        try {
+          await videoRef.current.play()
+        } catch (playErr: any) {
+          if (playErr?.name !== "AbortError") {
+            videoRef.current.onloadedmetadata = () => {
+              videoRef.current?.play().catch(() => {})
+            }
+          }
+        }
         setIsCameraActive(true)
         setHasPermission(true)
         refreshDevices()

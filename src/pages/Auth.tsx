@@ -22,6 +22,7 @@ import { useAuthAndTheme } from "@/context/AuthAndThemeContext"
 import { INDIC_LANGUAGES } from "@/lib/speech"
 import Logo from "@/components/brand/Logo"
 import WelcomeOverlay from "@/components/auth/WelcomeOverlay"
+import { API_BASE_URL } from "@/config/api"
 
 interface CaptchaData {
   question: string
@@ -94,7 +95,7 @@ export default function Auth() {
     setCaptchaAnswer("")
     setIsCaptchaValid(false)
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/auth/captcha")
+      const res = await fetch(`${API_BASE_URL}/api/auth/captcha`)
       if (res.ok) {
         const data = await res.json()
         setCaptchaData(data)
@@ -162,7 +163,7 @@ export default function Auth() {
     try {
       if (isSignUp) {
         // --- 1. SIGN UP (PREVENT DUPLICATE ACCOUNTS) ---
-        const response = await fetch("http://127.0.0.1:8000/api/auth/register", {
+        const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -202,7 +203,7 @@ export default function Auth() {
         }, 1000)
       } else {
         // --- 2. SIGN IN ---
-        const response = await fetch("http://127.0.0.1:8000/api/auth/login", {
+        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -280,7 +281,7 @@ export default function Auth() {
 
             {/* Top Brand Header */}
             <div className="relative z-10 flex flex-col gap-3">
-              <Logo variant="full" size="md" />
+              <Logo variant="full" size="md" theme="dark" />
               <div className="inline-flex items-center gap-1.5 self-start px-2.5 py-0.5 rounded-full bg-[#ffb23e]/15 border border-[#ffb23e]/30 text-[#ffb23e] text-[11px] font-bold">
                 <Sparkles className="h-3 w-3" />
                 <span>ISL Neural Bridge 2.0</span>

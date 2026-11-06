@@ -17,14 +17,12 @@ export default function ResearchPortal() {
   const [activeTab, setActiveTab] = useState<"paper" | "dataset" | "benchmarks">("paper")
   const [copiedBibtex, setCopiedBibtex] = useState(false)
 
-  const bibtexCitation = `@article{bharatsign_bridge_2026,
+  const bibtexCitation = `@misc{bharatsign_bridge_2026,
   title={BharatSign Bridge 2.0: Multimodal Indian Sign Language Recognition, 3D Procedural Avatar Kinematics, and Multilingual Acoustic Synthesis},
   author={Tirth and Prasham and Ayush and Smit and Dhruvi and Jignyasa},
-  journal={IEEE Transactions on Neural Systems and Rehabilitation Engineering},
-  volume={34},
-  pages={1120--1135},
   year={2026},
-  publisher={IEEE}
+  howpublished={Preprint / Technical Report},
+  note={Indian Sign Language AI Open Research Project, https://github.com/tladani395-hub/BharatSign-Bridge}
 }`
 
   const handleCopyBibtex = () => {
@@ -121,7 +119,7 @@ export default function ResearchPortal() {
             <div className="p-8 rounded-3xl bg-card border border-border shadow-xl flex flex-col gap-5">
               <div className="flex flex-col gap-1">
                 <span className="text-xs uppercase font-mono tracking-wider text-primary">
-                  Conference Submission Ready (IEEE / ACM SIGACCESS)
+                  Open Research Preprint & Technical Report (Prepared for Accessibility Submission)
                 </span>
                 <h2 className="text-2xl sm:text-3xl font-black text-foreground">
                   BharatSign Bridge 2.0: Multimodal Indian Sign Language Recognition, 3D Procedural Avatar Kinematics, and Multilingual Acoustic Synthesis

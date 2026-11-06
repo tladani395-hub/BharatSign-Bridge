@@ -36,6 +36,7 @@ import { useAuthAndTheme } from "@/context/AuthAndThemeContext"
 import { INDIC_LANGUAGES, speakText } from "@/lib/speech"
 import { downloadCertificatePNG } from "@/lib/certificateGenerator"
 import { playFanfare, playSuccessChime } from "@/lib/soundEffects"
+import { API_BASE_URL } from "@/config/api"
 
 export default function Profile() {
   const {
@@ -124,7 +125,7 @@ export default function Profile() {
       const token = localStorage.getItem("bharatsign_token")
       const headers: Record<string, string> = { "Content-Type": "application/json" }
       if (token) headers["Authorization"] = `Bearer ${token}`
-      await fetch("http://127.0.0.1:8000/api/auth/profile", {
+      await fetch(`${API_BASE_URL}/api/auth/profile`, {
         method: "PUT",
         headers,
         body: JSON.stringify({ email: user.email, avatar_url: avatarUrl }),
@@ -142,7 +143,7 @@ export default function Profile() {
       const token = localStorage.getItem("bharatsign_token")
       const headers: Record<string, string> = { "Content-Type": "application/json" }
       if (token) headers["Authorization"] = `Bearer ${token}`
-      const res = await fetch("http://127.0.0.1:8000/api/auth/profile", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/profile`, {
         method: "PUT",
         headers,
         body: JSON.stringify({
@@ -193,7 +194,12 @@ export default function Profile() {
     if (!user) return
     const fetchOrClaimCert = async () => {
       try {
-        const res = await fetch(`http://127.0.0.1:8000/api/certificates/user/${encodeURIComponent(user.email)}`)
+        const token = localStorage.getItem("bharatsign_token")
+        const headers: Record<string, string> = {}
+        if (token) headers["Authorization"] = `Bearer ${token}`
+        const res = await fetch(`${API_BASE_URL}/api/certificates/user/${encodeURIComponent(user.email)}`, {
+          headers
+        })
         if (res.ok) {
           const data = await res.json()
           if (data.has_certificate && data.certificate) {
@@ -204,13 +210,6 @@ export default function Profile() {
         }
       } catch {
         // Backend offline fallback
-      }
-
-      if (user.email === "student@bharatsign.ai" || user.name.toLowerCase().includes("tirth")) {
-        setCertId("BSB-2026-1047")
-      } else {
-        const hashNum = Math.abs(user.email.split("").reduce((acc, c) => acc + c.charCodeAt(0), 1047)) % 9000 + 1000
-        setCertId(`BSB-2026-${hashNum}`)
       }
     }
 
@@ -240,7 +239,7 @@ export default function Profile() {
       const token = localStorage.getItem("bharatsign_token")
       const headers: Record<string, string> = { "Content-Type": "application/json" }
       if (token) headers["Authorization"] = `Bearer ${token}`
-      const res = await fetch("http://127.0.0.1:8000/api/certificates/claim", {
+      const res = await fetch(`${API_BASE_URL}/api/certificates/claim`, {
         method: "POST",
         headers,
         body: JSON.stringify({

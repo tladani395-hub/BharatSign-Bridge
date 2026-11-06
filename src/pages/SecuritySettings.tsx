@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAuthAndTheme } from "@/context/AuthAndThemeContext"
+import { API_BASE_URL } from "@/config/api"
 
 interface QuestionOption {
   id: string
@@ -56,9 +57,15 @@ export default function SecuritySettings() {
   useEffect(() => {
     const loadData = async () => {
       try {
+        const token = localStorage.getItem("bharatsign_token")
+        const authHeaders: Record<string, string> = {}
+        if (token) authHeaders["Authorization"] = `Bearer ${token}`
+
         const [qRes, sRes] = await Promise.all([
-          fetch("http://127.0.0.1:8000/api/auth/security-questions/list"),
-          fetch(`http://127.0.0.1:8000/api/auth/security-questions/status?user_id=${user?.id || ""}&email=${encodeURIComponent(user?.email || "")}`)
+          fetch(`${API_BASE_URL}/api/auth/security-questions/list`),
+          fetch(`${API_BASE_URL}/api/auth/security-questions/status`, {
+            headers: authHeaders
+          })
         ])
 
         const qData = await qRes.json()
@@ -109,12 +116,14 @@ export default function SecuritySettings() {
 
     setSubmitting(true)
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/auth/security-questions/update", {
+      const token = localStorage.getItem("bharatsign_token")
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) headers["Authorization"] = `Bearer ${token}`
+
+      const res = await fetch(`${API_BASE_URL}/api/auth/security-questions/update`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
-          user_id: user?.id || "",
-          email: user?.email || "",
           current_password: currentPassword,
           question_1_id: question1Id,
           answer_1: cleanAns1,
