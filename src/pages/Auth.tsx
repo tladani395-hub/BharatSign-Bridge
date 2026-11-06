@@ -14,7 +14,6 @@ import {
   EyeOff,
   Sparkles,
   Zap,
-  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -90,12 +89,7 @@ export default function Auth() {
   const [isDuplicateEmail, setIsDuplicateEmail] = useState(false)
   const [hasErrorShake, setHasErrorShake] = useState(false)
 
-  // Social Login (Google & GitHub) State
-  const [socialProvider, setSocialProvider] = useState<"google" | "github" | null>(null)
-  const [socialEmail, setSocialEmail] = useState("")
-  const [socialName, setSocialName] = useState("")
-  const [isSocialSubmitting, setIsSocialSubmitting] = useState(false)
-  const [socialError, setSocialError] = useState<string | null>(null)
+  // OAuth 2.0 Client Configuration
   const [oauthConfig, setOauthConfig] = useState<{
     google?: { enabled: boolean; client_id: string }
     github?: { enabled: boolean; client_id: string }
@@ -118,13 +112,19 @@ export default function Auth() {
   }, [])
 
   const handleInitiateOAuth = (provider: "google" | "github") => {
-    setSocialError(null)
+    setAuthError(null)
 
-    // If live Google OAuth credentials exist in .env, redirect directly to Google consent
-    if (provider === "google" && oauthConfig?.google?.enabled && oauthConfig.google.client_id) {
+    if (provider === "google") {
+      const clientId = oauthConfig?.google?.client_id || ""
+      if (!clientId) {
+        triggerError(
+          "To open Google's sign-in page, please set GOOGLE_CLIENT_ID in your .env file."
+        )
+        return
+      }
       const redirectUri = `${window.location.origin}/auth/callback`
       const params = new URLSearchParams({
-        client_id: oauthConfig.google.client_id,
+        client_id: clientId,
         redirect_uri: redirectUri,
         response_type: "code",
         scope: "openid email profile",
@@ -135,85 +135,23 @@ export default function Auth() {
       return
     }
 
-    // If live GitHub OAuth credentials exist in .env, redirect directly to GitHub authorization
-    if (provider === "github" && oauthConfig?.github?.enabled && oauthConfig.github.client_id) {
+    if (provider === "github") {
+      const clientId = oauthConfig?.github?.client_id || ""
+      if (!clientId) {
+        triggerError(
+          "To open GitHub's sign-in page, please set GITHUB_CLIENT_ID in your .env file."
+        )
+        return
+      }
       const redirectUri = `${window.location.origin}/auth/callback`
       const params = new URLSearchParams({
-        client_id: oauthConfig.github.client_id,
+        client_id: clientId,
         redirect_uri: redirectUri,
         scope: "read:user user:email",
         state: "github",
       })
       window.location.href = `https://github.com/login/oauth/authorize?${params.toString()}`
       return
-    }
-
-    // Otherwise open the interactive authorization modal
-    setSocialProvider(provider)
-    const baseEmail = email.trim().toLowerCase()
-    if (provider === "google") {
-      setSocialEmail(baseEmail && baseEmail.includes("@") ? baseEmail : "student@gmail.com")
-      setSocialName(name.trim() || "Google Learner")
-    } else {
-      setSocialEmail(baseEmail && baseEmail.includes("@") ? baseEmail : "developer@github.com")
-      setSocialName(name.trim() || "GitHub Contributor")
-    }
-  }
-
-  const handleSocialSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault()
-    if (!socialProvider) return
-    if (!socialEmail.trim() || !socialEmail.includes("@")) {
-      setSocialError("Please enter a valid email address.")
-      return
-    }
-
-    setIsSocialSubmitting(true)
-    setSocialError(null)
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/social-login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          provider: socialProvider,
-          provider_id: `${socialProvider}_${Date.now()}`,
-          email: socialEmail.trim().toLowerCase(),
-          name: socialName.trim() || (socialProvider === "google" ? "Google User" : "GitHub Developer"),
-          avatar_url:
-            socialProvider === "google"
-              ? "https://lh3.googleusercontent.com/a/default-avatar"
-              : "https://avatars.githubusercontent.com/u/12345678",
-        }),
-      })
-
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data.detail || `Failed to authenticate with ${socialProvider}.`)
-      }
-
-      setSocialProvider(null)
-      setIsUnlocked(true)
-
-      if (data.isNewUser) {
-        setPendingUserData({ ...data.user, token: data.token })
-        setTimeout(() => {
-          setShowWelcome(true)
-        }, 900)
-      } else {
-        setTimeout(() => {
-          login(data.user.name, data.user.email, data.user.preferredLanguage, data.user, data.token)
-          if (data.user && data.user.hasSecurityQuestions === false) {
-            navigate("/security-setup", { replace: true })
-          } else {
-            navigate(from, { replace: true })
-          }
-        }, 900)
-      }
-    } catch (err: any) {
-      setSocialError(err.message || "Social authentication failed.")
-    } finally {
-      setIsSocialSubmitting(false)
     }
   }
 
@@ -846,167 +784,7 @@ export default function Auth() {
 
       {/* Post Sign-Up Welcome Animation Overlay */}
       <WelcomeOverlay show={showWelcome} onDone={handleWelcomeDone} />
-
-      {/* Social Identity Authentication Modal */}
-      {socialProvider && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#0e1328] border border-[#d8e0f2] dark:border-[#222b4a] p-6 shadow-2xl relative animate-in zoom-in-95 duration-200">
-            {/* Close Button */}
-            <button
-              type="button"
-              onClick={() => setSocialProvider(null)}
-              className="absolute top-4 right-4 p-1.5 rounded-lg text-[#586082] dark:text-[#828bb4] hover:text-[#0e1430] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              title="Close modal"
-            >
-              <X className="h-4 w-4" />
-            </button>
-
-            {/* Provider Header */}
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-11 h-11 rounded-xl bg-[#f3f5fb] dark:bg-[#151b36] border border-[#d8e0f2] dark:border-[#222b4a] flex items-center justify-center shadow-xs">
-                {socialProvider === "google" ? (
-                  <GoogleIcon className="w-6 h-6" />
-                ) : (
-                  <GitHubIcon className="w-6 h-6 text-[#0e1430] dark:text-[#eef1ff]" />
-                )}
-              </div>
-              <div>
-                <h3 className="text-sm font-extrabold text-[#0e1430] dark:text-[#eef1ff]">
-                  Continue with {socialProvider === "google" ? "Google" : "GitHub"}
-                </h3>
-                <p className="text-[11px] text-[#586082] dark:text-[#828bb4]">
-                  {isSignUp ? "Create a verified account" : "Sign in to your learning account"}
-                </p>
-              </div>
-            </div>
-
-            {/* OAuth Info Banner */}
-            <div className="mb-4 p-3 rounded-xl bg-[#2f4bff]/5 dark:bg-[#2f4bff]/10 border border-[#2f4bff]/20 text-xs text-left">
-              <div className="flex items-center gap-1.5 font-bold text-[#2f4bff] dark:text-[#60a5fa] mb-1">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>OAuth 2.0 Secure Authorization</span>
-              </div>
-              <p className="text-[11px] text-[#586082] dark:text-[#828bb4] leading-relaxed">
-                Connect your account or authorize with one-click profile credentials below. All authorizations issue cryptographic HMAC-SHA256 session tokens.
-              </p>
-            </div>
-
-            {socialError && (
-              <div className="p-3 mb-4 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{socialError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSocialSubmit} className="flex flex-col gap-3.5">
-              <div className="flex flex-col gap-1">
-                <Label className="text-xs font-bold text-[#0e1430] dark:text-[#eef1ff]">
-                  {socialProvider === "google" ? "Google Account Email" : "GitHub Account Email"}
-                </Label>
-                <div className="relative">
-                  <Mail className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#586082] dark:text-[#828bb4]" />
-                  <Input
-                    type="email"
-                    required
-                    value={socialEmail}
-                    onChange={(e) => setSocialEmail(e.target.value)}
-                    placeholder={socialProvider === "google" ? "user@gmail.com" : "user@github.com"}
-                    className="pl-9 h-10 rounded-xl bg-[#f3f5fb] dark:bg-[#151b36] border-[#d8e0f2] dark:border-[#222b4a] text-xs font-semibold"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <Label className="text-xs font-bold text-[#0e1430] dark:text-[#eef1ff]">
-                  Display Name
-                </Label>
-                <div className="relative">
-                  <User className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#586082] dark:text-[#828bb4]" />
-                  <Input
-                    type="text"
-                    required
-                    value={socialName}
-                    onChange={(e) => setSocialName(e.target.value)}
-                    placeholder="Your Name"
-                    className="pl-9 h-10 rounded-xl bg-[#f3f5fb] dark:bg-[#151b36] border-[#d8e0f2] dark:border-[#222b4a] text-xs font-semibold"
-                  />
-                </div>
-              </div>
-
-              {/* Quick Select Preset Identities */}
-              <div className="flex flex-col gap-1 pt-1">
-                <span className="text-[10px] font-bold text-[#586082] dark:text-[#828bb4] uppercase tracking-wider">
-                  Quick Profiles
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (socialProvider === "google") {
-                        setSocialEmail("student@gmail.com")
-                        setSocialName("ISL Student")
-                      } else {
-                        setSocialEmail("developer@github.com")
-                        setSocialName("GitHub Developer")
-                      }
-                    }}
-                    className="flex-1 py-1 px-2.5 rounded-lg border border-[#d8e0f2] dark:border-[#222b4a] bg-[#f9fbfd] dark:bg-[#151b36] hover:bg-[#edf2fa] dark:hover:bg-[#1a2347] text-[11px] font-semibold text-[#0e1430] dark:text-[#eef1ff] transition-colors text-center"
-                  >
-                    {socialProvider === "google" ? "student@gmail.com" : "developer@github.com"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (socialProvider === "google") {
-                        setSocialEmail("scholar.isl@gmail.com")
-                        setSocialName("Aarav Sharma")
-                      } else {
-                        setSocialEmail("sign.fellow@github.com")
-                        setSocialName("Dr. Sharma")
-                      }
-                    }}
-                    className="flex-1 py-1 px-2.5 rounded-lg border border-[#d8e0f2] dark:border-[#222b4a] bg-[#f9fbfd] dark:bg-[#151b36] hover:bg-[#edf2fa] dark:hover:bg-[#1a2347] text-[11px] font-semibold text-[#0e1430] dark:text-[#eef1ff] transition-colors text-center"
-                  >
-                    {socialProvider === "google" ? "scholar.isl@gmail.com" : "sign.fellow@github.com"}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 pt-2">
-                <Button
-                  type="submit"
-                  disabled={isSocialSubmitting}
-                  className="flex-1 h-10 text-xs font-bold rounded-xl bg-gradient-to-r from-[#2f4bff] to-[#1fa2ff] text-white shadow-md hover:opacity-95 flex items-center justify-center gap-2"
-                >
-                  {isSocialSubmitting ? (
-                    <>
-                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                      <span>Authenticating...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Authorize with {socialProvider === "google" ? "Google" : "GitHub"}</span>
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </>
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setSocialProvider(null)}
-                  className="h-10 text-xs font-semibold rounded-xl"
-                >
-                  Cancel
-                </Button>
-              </div>
-
-              <p className="text-[10px] text-center text-[#586082] dark:text-[#828bb4]">
-                Protected by HMAC-SHA256 tokens and ISLRTC security standards.
-              </p>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
+
