@@ -75,3 +75,297 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(0.5deg);
+  }
+}
+
+@keyframes float-reverse {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(8px) rotate(-0.5deg);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+    filter: drop-shadow(0 0 15px rgba(6, 182, 212, 0.4));
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.03);
+    filter: drop-shadow(0 0 30px rgba(59, 130, 246, 0.8));
+  }
+}
+
+@keyframes radar-sweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-float {
+  animation: float 5s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: float-reverse 6s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+.animate-radar {
+  animation: radar-sweep 8s linear infinite;
+}
+
+.animate-marquee {
+  display: flex;
+  width: 200%;
+  animation: marquee 25s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* ==================== BHARATSIGN 2.0 REDESIGN STYLES ==================== */
+
+.font-heading {
+  font-family: 'Bricolage Grotesque', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.font-body {
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.font-code {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Card entrance: fade + rise 24px + scale .97, 0.7s cubic-bezier(.2,.8,.2,1) */
+@keyframes card-entrance {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-card-entrance {
+  animation: card-entrance 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+/* View transition: slide 28px + fade, 0.4s cubic-bezier(.3,1,.4,1) */
+@keyframes view-slide-fade {
+  0% {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-view-switch {
+  animation: view-slide-fade 0.4s cubic-bezier(0.3, 1, 0.4, 1) forwards;
+}
+
+/* Invalid field horizontal shake: 0.4s */
+@keyframes field-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+.animate-field-shake {
+  animation: field-shake 0.4s ease-in-out;
+}
+
+/* Button sheen sweep */
+@keyframes sheen-sweep {
+  0% {
+    transform: translateX(-120%) skewX(-20deg);
+  }
+  100% {
+    transform: translateX(280%) skewX(-20deg);
+  }
+}
+
+.btn-sheen {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-sheen:hover::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  animation: sheen-sweep 0.75s ease-out;
+  pointer-events: none;
+}
+
+/* Blinking Logo Eye */
+@keyframes logo-eye-blink {
+  0%, 86%, 100% {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  90%, 94% {
+    transform: scaleY(1);
+    opacity: 0.95;
+  }
+}
+
+.logo-eyelid {
+  transform-origin: 24px 24px;
+  animation: logo-eye-blink 2.6s ease-in-out infinite;
+}
+
+/* Success SVG stroke dash draw */
+@keyframes stroke-circle-draw {
+  from {
+    stroke-dashoffset: 140;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes stroke-check-draw {
+  from {
+    stroke-dashoffset: 40;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes pop-bounce {
+  0% { transform: scale(0.85); }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.animate-stroke-circle {
+  stroke-dasharray: 140;
+  stroke-dashoffset: 140;
+  animation: stroke-circle-draw 0.5s ease-out forwards;
+}
+
+.animate-stroke-check {
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  animation: stroke-check-draw 0.45s 0.22s ease-out forwards;
+}
+
+.animate-pop {
+  animation: pop-bounce 0.5s cubic-bezier(0.3, 1.3, 0.5, 1) forwards;
+}
+
+/* Slow-drifting blurred colour blobs */
+@keyframes blob-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(32px, -24px) scale(1.08); }
+}
+
+@keyframes blob-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-30px, 28px) scale(1.09); }
+}
+
+.animate-blob-1 {
+  animation: blob-drift-1 16s ease-in-out infinite;
+}
+
+.animate-blob-2 {
+  animation: blob-drift-2 19s ease-in-out infinite;
+}
+
+/* Orbit Graphic in Brand Panel */
+@keyframes orbit-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes orbit-counter {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+
+.animate-orbit-spin {
+  animation: orbit-spin 26s linear infinite;
+}
+
+.animate-orbit-counter {
+  animation: orbit-counter 26s linear infinite;
+}
+
+/* Interactive Lock Unlocking Shackle Animation */
+.shackle-locked {
+  transition: transform 0.65s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: 16px 8px;
+}
+
+.shackle-unlocked {
+  transform: translateY(-5px) rotate(-34deg);
+}
+
+/* Spring Segment Tab transition */
+.tab-spring {
+  transition: all 0.35s cubic-bezier(0.3, 1.3, 0.5, 1);
+}
+
+/* Accessibility: Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-card-entrance,
+  .animate-view-switch,
+  .animate-field-shake,
+  .animate-blob-1,
+  .animate-blob-2,
+  .animate-orbit-spin,
+  .animate-orbit-counter,
+  .logo-eyelid,
+  .btn-sheen:hover::after {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+

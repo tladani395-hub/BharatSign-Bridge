@@ -1,0 +1,47 @@
+{
+  "evaluation_standard": "ISLRTC & MSJE (Ministry of Social Justice & Empowerment)",
+  "models": {
+    "model_a_static": {
+      "num_classes": 36,
+      "test_samples": 648,
+      "accuracy": 0.49537037037037035,
+      "weighted_f1": 0.49511791709680264,
+      "confusion_matrix_shape": [
+        36,
+        36
+      ],
+      "sample_classes": [
+        "DIGIT_0",
+        "DIGIT_1",
+        "DIGIT_2",
+        "DIGIT_3",
+        "DIGIT_4",
+        "DIGIT_5"
+      ]
+    },
+    "model_b_dynamic": {
+      "num_classes": 12,
+      "test_samples": 144,
+      "accuracy": 0.5833333333333334,
+      "weighted_f1": 0.5852926587301587,
+      "confusion_matrix_shape": [
+        12,
+        12
+      ],
+      "classes": [
+        "HELLO",
+        "NAMASTE",
+        "THANK_YOU",
+        "WELCOME",
+        "WATER",
+        "HELP",
+        "STUDENT",
+        "INDIA",
+        "YES",
+        "NO",
+        "HOW_ARE_YOU",
+        "WHAT_IS_YOUR_NAME"
+      ]
+    }
+  }
+}

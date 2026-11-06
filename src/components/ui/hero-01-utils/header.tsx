@@ -8,6 +8,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import Logo from "@/components/brand/Logo"
 
 export interface NavigationSection {
   title: string
@@ -28,24 +29,7 @@ export default function Header({ navigationData }: HeaderProps) {
       <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Brand Logo & Tag */}
         <div className="flex items-center gap-3">
-          <a href="#" className="flex items-center gap-2.5 group">
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 p-0.5 shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform">
-              <div className="flex h-full w-full items-center justify-center rounded-[10px] bg-slate-950 text-white font-bold text-lg">
-                <span className="bg-gradient-to-r from-cyan-400 to-indigo-300 bg-clip-text text-transparent">BS</span>
-              </div>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-lg font-bold tracking-tight text-foreground flex items-center gap-1.5">
-                BharatSign<span className="text-primary font-extrabold">Bridge</span>
-                <span className="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary border border-primary/20">
-                  ISL AI
-                </span>
-              </span>
-              <span className="text-[11px] text-muted-foreground font-medium">
-                Research & Communication Ecosystem
-              </span>
-            </div>
-          </a>
+          <Logo variant="full" size="md" />
         </div>
 
         {/* Desktop Navigation */}
@@ -108,10 +92,10 @@ export default function Header({ navigationData }: HeaderProps) {
               </SheetTrigger>
               <SheetContent side="right" className="w-[300px] sm:w-[350px]">
                 <SheetHeader className="border-b pb-4 mb-4">
-                  <SheetTitle className="text-left flex items-center gap-2 text-base font-bold">
-                    <span className="text-primary">BharatSign</span>Bridge
+                  <SheetTitle className="text-left flex items-center gap-2">
+                    <Logo variant="full" size="sm" />
                   </SheetTitle>
-                  <p className="text-xs text-muted-foreground text-left">
+                  <p className="text-xs text-muted-foreground text-left mt-1">
                     Indian Sign Language AI Platform & Research Lab
                   </p>
                 </SheetHeader>

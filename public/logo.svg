@@ -1,0 +1,48 @@
+<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Base rounded shield / bridge arch -->
+  <rect width="48" height="48" rx="14" fill="#102A43" />
+  
+  <!-- Radial cyan glow behind glyph -->
+  <circle cx="24" cy="24" r="16" fill="url(#cyanGlow)" opacity="0.25" />
+
+  <!-- Left Hand Silhouette / Node Arc -->
+  <path
+    d="M14 28C14 21.3726 19.3726 16 26 16C28.5 16 30.5 17 32 18.5"
+    stroke="#22D3EE"
+    stroke-width="3.2"
+    stroke-linecap="round"
+  />
+
+  <!-- Right Hand Silhouette / Connecting Arch Bridge -->
+  <path
+    d="M34 20C34 26.6274 28.6274 32 22 32C19.5 32 17.5 31 16 29.5"
+    stroke="#3B82F6"
+    stroke-width="3.2"
+    stroke-linecap="round"
+  />
+
+  <!-- Intersecting Gesture Connection Knot & AI Eye -->
+  <g class="logo-eye-center">
+    <circle cx="24" cy="24" r="4.2" fill="#FFFFFF" />
+    <circle cx="24" cy="24" r="2.2" fill="#0E6E8C" />
+  </g>
+
+  <!-- Dynamic Gesture Finger Radiance Points -->
+  <circle cx="16" cy="18" r="2" fill="#38BDF8" />
+  <circle cx="32" cy="30" r="2" fill="#38BDF8" />
+  <circle cx="34" cy="16" r="1.8" fill="#22D3EE" />
+
+  <defs>
+    <radialGradient
+      id="cyanGlow"
+      cx="0"
+      cy="0"
+      r="1"
+      gradientUnits="userSpaceOnUse"
+      gradientTransform="translate(24 24) rotate(90) scale(16)"
+    >
+      <stop stop-color="#38BDF8" />
+      <stop offset="1" stop-color="#102A43" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+</svg>

@@ -2,8 +2,19 @@ import { useEffect, useRef, useState } from "react"
 import * as THREE from "three"
 import { Play, Pause, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  useAvatarCustomization,
+  getStoredAvatarCustomization,
+  HAIR_COLOR_PALETTES,
+  CLOTHING_COLOR_PALETTES,
+  SKIN_TONE_PALETTES,
+  type AvatarCustomization,
+} from "@/context/AvatarCustomizationContext"
 
 export type SignGesture =
+  | "STAND_STRAIGHT"
+  | "IDLE"
+  | "STRAIGHT"
   | "DEMO_10S"
   | "NAMASTE"
   | "THANK_YOU"
@@ -15,35 +26,74 @@ export type SignGesture =
   | "NO"
   | string
 
+export type CameraPreset = "full-body" | "upper-body" | "hands" | "right-hand" | "left-hand" | "face"
+
+const CAMERA_PRESETS: Record<CameraPreset, { pos: [number, number, number]; look: [number, number, number] }> = {
+  "full-body": { pos: [0, 1.05, 4.4], look: [0, 0.95, 0] },
+  "upper-body": { pos: [0, 1.45, 2.5], look: [0, 1.38, 0] },
+  "hands": { pos: [0, 1.28, 1.65], look: [0, 1.25, 0] },
+  "right-hand": { pos: [0.35, 1.3, 1.35], look: [0.2, 1.25, 0] },
+  "left-hand": { pos: [-0.35, 1.3, 1.35], look: [-0.2, 1.25, 0] },
+  "face": { pos: [0, 1.74, 1.15], look: [0, 1.72, 0] },
+}
+
 interface ThreeAvatarProps {
   activeGesture?: SignGesture
   signingSpeed?: number
   onGestureComplete?: () => void
   showControls?: boolean
+  initialCameraView?: CameraPreset
+  customization?: Partial<AvatarCustomization>
 }
 
 export default function ThreeAvatar({
-  activeGesture = "DEMO_10S",
+  activeGesture = "STAND_STRAIGHT",
   signingSpeed = 1.0,
   showControls = true,
+  initialCameraView = "upper-body",
+  customization: propsCustomization,
 }: ThreeAvatarProps) {
   const mountRef = useRef<HTMLDivElement>(null)
+  const avatarContext = useAvatarCustomization()
+  const activeCustomization: AvatarCustomization = {
+    ...(avatarContext?.customization || getStoredAvatarCustomization()),
+    ...(propsCustomization || {}),
+  }
+  const customizationKey = JSON.stringify(activeCustomization)
+  const [customizationTick, setCustomizationTick] = useState(0)
+
+  useEffect(() => {
+    const handleAvatarChange = () => {
+      setCustomizationTick((t) => t + 1)
+    }
+    window.addEventListener("bharatsign_avatar_changed", handleAvatarChange)
+    return () => window.removeEventListener("bharatsign_avatar_changed", handleAvatarChange)
+  }, [])
   const [currentGesture, setCurrentGesture] = useState<SignGesture>(activeGesture)
   const [isPlaying, setIsPlaying] = useState(true)
   const [timelineSec, setTimelineSec] = useState(0)
   const [phaseText, setPhaseText] = useState("0–2s: Standing naturally, looking at the camera")
   const [speed, setSpeed] = useState(signingSpeed)
+  const [cameraPreset, setCameraPreset] = useState<CameraPreset>(initialCameraView)
 
   const currentGestureRef = useRef<SignGesture>(activeGesture)
   const isPlayingRef = useRef<boolean>(true)
   const timelineSecRef = useRef<number>(0)
   const speedRef = useRef<number>(signingSpeed)
+  const cameraPresetRef = useRef<CameraPreset>(initialCameraView)
 
   useEffect(() => {
     currentGestureRef.current = activeGesture
     setCurrentGesture(activeGesture)
     timelineSecRef.current = 0
   }, [activeGesture])
+
+  useEffect(() => {
+    if (initialCameraView) {
+      setCameraPreset(initialCameraView)
+      cameraPresetRef.current = initialCameraView
+    }
+  }, [initialCameraView])
 
   useEffect(() => {
     isPlayingRef.current = isPlaying
@@ -113,19 +163,30 @@ export default function ThreeAvatar({
     disc.position.y = 0.002
     scene.add(disc)
 
-    // Materials
+    // Materials with dynamic character customization
     function M(c: number, r?: number) {
       return new T.MeshStandardMaterial({ color: c, roughness: r == null ? 0.6 : r, metalness: 0 })
     }
-    const skin = M(0xc48a5a, 0.55)
-    const shirt = M(0x14264d, 0.7)
-    const shirt2 = M(0x1d3a72, 0.7)
+
+    const skinColor = SKIN_TONE_PALETTES[activeCustomization.skinTone]?.hex ?? 0xc48a5a
+    const hairColor = HAIR_COLOR_PALETTES[activeCustomization.hairColor]?.hex ?? 0x0c0c10
+    const clothingPalette =
+      CLOTHING_COLOR_PALETTES[activeCustomization.clothingColor] ??
+      CLOTHING_COLOR_PALETTES["deep-navy"]
+    const shirtColor = clothingPalette.primary
+    const accentColor = clothingPalette.secondary
+
+    const skin = M(skinColor, 0.55)
+    const shirt = M(shirtColor, 0.7)
+    const shirt2 = M(accentColor, 0.7)
     const pants = M(0x14171f, 0.8)
     const shoe = M(0x08090c, 0.4)
-    const hairM = M(0x0b0b0e, 0.5)
+    const hairM = M(hairColor, 0.5)
     const white = M(0xf2eee8, 0.3)
     const dark = M(0x1a0f0a, 0.3)
     const lip = M(0x7a3a33, 0.6)
+    const gold = new T.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.3, metalness: 0.8 })
+    const glassMat = new T.MeshStandardMaterial({ color: 0x0e1726, roughness: 0.2, metalness: 0.9 })
 
     function sph(r: number, m: THREE.Material, x?: number, y?: number, z?: number, sx?: number, sy?: number, sz?: number) {
       const o = new T.Mesh(new T.SphereGeometry(r, 24, 16), m)
@@ -164,16 +225,84 @@ export default function ThreeAvatar({
     hips.scale.z = 0.66
     body.add(hips)
 
+    // Torso & Clothing Customization
     const torso = cyl(0.215, 0.17, 0.62, shirt, 1.25)
     torso.scale.z = 0.62
     body.add(torso)
 
+    // Neck
     body.add(cyl(0.05, 0.056, 0.12, skin, 1.62))
 
-    const collar = new T.Mesh(new T.TorusGeometry(0.06, 0.013, 8, 24), shirt2)
-    collar.rotation.x = Math.PI / 2
-    collar.position.y = 1.575
-    body.add(collar)
+    if (activeCustomization.clothingStyle === "kurta") {
+      // Nehru Mandarin Collar
+      const collar = new T.Mesh(new T.TorusGeometry(0.058, 0.016, 8, 24), shirt2)
+      collar.rotation.x = Math.PI / 2
+      collar.position.y = 1.575
+      body.add(collar)
+      // Extended Kurta skirt falling over hips down past thighs
+      const skirt = cyl(0.2, 0.235, 0.38, shirt, 0.84)
+      skirt.scale.z = 0.64
+      body.add(skirt)
+      // Front vertical placket & golden button studs
+      const placket = box(0.024, 0.48, 0.01, shirt2, 0, 1.28, 0.134)
+      body.add(placket)
+      for (let bi = 0; bi < 4; bi++) {
+        const btn = sph(0.005, gold, 0, 1.42 - bi * 0.08, 0.14)
+        body.add(btn)
+      }
+    } else if (activeCustomization.clothingStyle === "blazer") {
+      // Inner shirt in crisp white
+      const innerV = box(0.08, 0.22, 0.01, white, 0, 1.44, 0.132)
+      body.add(innerV)
+      // Lapels
+      ;[-1, 1].forEach((s) => {
+        const lapel = box(0.055, 0.24, 0.018, shirt2, s * 0.075, 1.42, 0.136)
+        lapel.rotation.z = -s * 0.22
+        body.add(lapel)
+      })
+      // Collar
+      const collar = new T.Mesh(new T.TorusGeometry(0.062, 0.014, 8, 24), shirt2)
+      collar.rotation.x = Math.PI / 2
+      collar.position.y = 1.575
+      body.add(collar)
+      // Blazer central button
+      body.add(sph(0.007, gold, 0, 1.18, 0.138))
+    } else if (activeCustomization.clothingStyle === "hoodie") {
+      // Chunky hood drape behind neck
+      const hoodDrape = new T.Mesh(new T.TorusGeometry(0.078, 0.024, 8, 24), shirt)
+      hoodDrape.rotation.x = Math.PI / 2.2
+      hoodDrape.position.set(0, 1.55, -0.03)
+      body.add(hoodDrape)
+      // Front kangaroo pocket
+      const pocket = box(0.19, 0.13, 0.025, shirt2, 0, 1.08, 0.135)
+      body.add(pocket)
+      // Drawstrings
+      ;[-1, 1].forEach((s) => {
+        const str = cyl(0.003, 0.003, 0.12, white, 1.42)
+        str.position.set(s * 0.035, 0, 0.14)
+        body.add(str)
+      })
+    } else if (activeCustomization.clothingStyle === "traditional-sari") {
+      // Diagonal cultural sash / dupatta draped across torso
+      const sash = box(0.09, 0.62, 0.022, shirt2, 0.015, 1.25, 0.134)
+      sash.rotation.z = -0.42
+      body.add(sash)
+      // Golden border along sash
+      const sashBorder = box(0.008, 0.64, 0.024, gold, 0.045, 1.25, 0.136)
+      sashBorder.rotation.z = -0.42
+      body.add(sashBorder)
+      // Round neckline
+      const collar = new T.Mesh(new T.TorusGeometry(0.065, 0.01, 8, 24), gold)
+      collar.rotation.x = Math.PI / 2
+      collar.position.y = 1.56
+      body.add(collar)
+    } else {
+      // "tshirt"
+      const collar = new T.Mesh(new T.TorusGeometry(0.06, 0.012, 8, 24), shirt2)
+      collar.rotation.x = Math.PI / 2
+      collar.position.y = 1.575
+      body.add(collar)
+    }
 
     // Head
     const head = new T.Group()
@@ -183,12 +312,101 @@ export default function ThreeAvatar({
     head.add(sph(0.11, skin, 0, 0, 0, 0.95, 1.15, 1))
     head.add(sph(0.075, skin, 0, -0.07, 0.025, 1, 0.9, 1))
 
-    const hair = new T.Mesh(new T.SphereGeometry(0.118, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.56), hairM)
-    hair.position.set(0, 0.012, -0.004)
-    hair.scale.set(0.97, 1.14, 1.03)
-    hair.rotation.x = -0.42
-    hair.castShadow = true
-    head.add(hair)
+    // Hairstyle Customization
+    const hairGroup = new T.Group()
+    head.add(hairGroup)
+
+    if (activeCustomization.hairstyle === "high-bun") {
+      // Sleek pulled base
+      const base = new T.Mesh(new T.SphereGeometry(0.12, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.58), hairM)
+      base.position.set(0, 0.012, -0.004)
+      base.rotation.x = -0.38
+      base.castShadow = true
+      hairGroup.add(base)
+      // Volumetric top knot bun
+      const bun = sph(0.048, hairM, 0, 0.13, -0.045, 1.15, 0.9, 1.1)
+      hairGroup.add(bun)
+      // Golden hairpin / hair tie ring
+      const ring = new T.Mesh(new T.TorusGeometry(0.044, 0.007, 8, 24), gold)
+      ring.rotation.x = Math.PI / 2.3
+      ring.position.set(0, 0.115, -0.042)
+      hairGroup.add(ring)
+    } else if (activeCustomization.hairstyle === "ponytail") {
+      // Sleek base
+      const base = new T.Mesh(new T.SphereGeometry(0.12, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.58), hairM)
+      base.position.set(0, 0.012, -0.004)
+      base.rotation.x = -0.42
+      base.castShadow = true
+      hairGroup.add(base)
+      // Ponytail tie
+      const band = sph(0.02, gold, 0, 0.04, -0.11, 1, 1, 0.7)
+      hairGroup.add(band)
+      // Flowing ponytail tail
+      const tail = cyl(0.024, 0.014, 0.22, hairM, -0.07)
+      tail.position.set(0, 0.02, -0.12)
+      tail.rotation.x = 0.26
+      hairGroup.add(tail)
+    } else if (activeCustomization.hairstyle === "long-waves") {
+      // Shoulder-length waves
+      const base = new T.Mesh(new T.SphereGeometry(0.122, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.62), hairM)
+      base.position.set(0, 0.012, -0.004)
+      base.rotation.x = -0.38
+      base.castShadow = true
+      hairGroup.add(base)
+      // Left & right cascades framing face
+      ;[-1, 1].forEach((s) => {
+        const wave = cyl(0.032, 0.02, 0.22, hairM, -0.09)
+        wave.position.set(s * 0.1, -0.01, 0.01)
+        wave.rotation.z = -s * 0.12
+        hairGroup.add(wave)
+      })
+    } else if (activeCustomization.hairstyle === "traditional-turban") {
+      // Rich Pagri / Turban wrapping
+      const pagri = sph(0.134, shirt, 0, 0.04, -0.005, 1.06, 1.12, 1.06)
+      hairGroup.add(pagri)
+      // Angled diagonal pagri band
+      const wrap = cyl(0.136, 0.13, 0.065, shirt2, 0.035)
+      wrap.rotation.x = -0.32
+      wrap.rotation.z = 0.15
+      hairGroup.add(wrap)
+      // Central golden crest / kalgi
+      const crest = sph(0.014, gold, 0, 0.055, 0.122, 0.8, 1.4, 0.6)
+      hairGroup.add(crest)
+    } else {
+      // "short-modern"
+      const hair = new T.Mesh(new T.SphereGeometry(0.118, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.56), hairM)
+      hair.position.set(0, 0.012, -0.004)
+      hair.scale.set(0.97, 1.14, 1.03)
+      hair.rotation.x = -0.42
+      hair.castShadow = true
+      hairGroup.add(hair)
+      // Sideburns
+      ;[-1, 1].forEach((s) => {
+        const sb = box(0.014, 0.048, 0.02, hairM, s * 0.095, -0.01, 0.01)
+        hairGroup.add(sb)
+      })
+    }
+
+    // Accessories: Glasses
+    if (activeCustomization.hasGlasses) {
+      ;[-1, 1].forEach((s) => {
+        const rim = new T.Mesh(new T.TorusGeometry(0.024, 0.003, 8, 20), glassMat)
+        rim.position.set(s * 0.042, 0.016, 0.108)
+        head.add(rim)
+        // Temples going back along head
+        const temple = box(0.003, 0.003, 0.09, glassMat, s * 0.065, 0.016, 0.06)
+        head.add(temple)
+      })
+      const bridge = box(0.02, 0.003, 0.003, glassMat, 0, 0.018, 0.11)
+      head.add(bridge)
+    }
+
+    // Accessories: Bindi
+    if (activeCustomization.hasBindi) {
+      const bindiMat = new T.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.4 })
+      const bindi = sph(0.006, bindiMat, 0, 0.03, 0.11, 1, 1, 0.4)
+      head.add(bindi)
+    }
 
     const lids: THREE.Object3D[] = []
     ;[-1, 1].forEach((s) => {
@@ -267,14 +485,33 @@ export default function ThreeAvatar({
       sh.position.set(s * 0.225, 1.5, 0)
       body.add(sh)
       sh.add(sph(0.085, shirt))
-      sh.add(cyl(0.054, 0.047, 0.3, shirt, -0.15))
+
+      const isShortSleeve = activeCustomization.clothingStyle === "tshirt"
+      if (isShortSleeve) {
+        // Short tee sleeve
+        sh.add(cyl(0.054, 0.048, 0.16, shirt, -0.08))
+        sh.add(cyl(0.046, 0.042, 0.15, skin, -0.225))
+      } else {
+        sh.add(cyl(0.054, 0.047, 0.3, shirt, -0.15))
+      }
 
       const el = new T.Group()
       el.position.y = -0.3
       sh.add(el)
-      el.add(sph(0.048, shirt))
-      el.add(cyl(0.047, 0.043, 0.1, shirt, -0.05))
-      el.add(cyl(0.039, 0.031, 0.17, skin, -0.185))
+
+      if (isShortSleeve) {
+        el.add(sph(0.044, skin))
+        el.add(cyl(0.042, 0.031, 0.27, skin, -0.135))
+      } else {
+        el.add(sph(0.048, shirt))
+        el.add(cyl(0.047, 0.043, 0.18, shirt, -0.09))
+        el.add(cyl(0.039, 0.031, 0.09, skin, -0.225))
+        // Sleeve wrist cuff
+        const cuff = new T.Mesh(new T.TorusGeometry(0.038, 0.008, 8, 20), shirt2)
+        cuff.rotation.x = Math.PI / 2
+        cuff.position.y = -0.18
+        el.add(cuff)
+      }
 
       const wr = new T.Group()
       wr.position.y = -0.275
@@ -298,7 +535,8 @@ export default function ThreeAvatar({
       return x * x * (3 - 2 * x)
     }
 
-    const REST = { sx: 0.05, sz: 0.1, ex: -0.12, roll: 0, wx: 0, wz: 0 }
+    // REST posture: Standing straight, arms naturally straight down at sides, zero elbow bend, hands not touching
+    const REST = { sx: 0, sz: 0.07, ex: 0, roll: 0, wx: 0, wz: 0 }
     const READY = { sx: -0.42, sz: 0, ex: -1.9, roll: 0.6, wx: -0.1, wz: 0 }
 
     function curl(f: FingerJoints, c: number, isT: boolean, s: number) {
@@ -318,7 +556,40 @@ export default function ThreeAvatar({
     function animateTimeline(t: number) {
       const g = currentGestureRef.current
 
-      if (g === "HELLO") {
+      if (
+        g === "STAND_STRAIGHT" ||
+        g === "IDLE" ||
+        g === "STRAIGHT" ||
+        g === "REST" ||
+        g === "STAND"
+      ) {
+        // Character standing straight upright, head looking forward
+        head.rotation.set(0, 0, 0)
+        mouth.scale.set(1.1, 0.45, 1)
+        body.rotation.set(0, 0, 0)
+
+        // Subtle gentle breathing
+        torso.scale.y = 1 + 0.003 * Math.sin(t * 1.5)
+
+        // Natural periodic blinking
+        const u = (t % 3.6) - 1.5
+        const b = Math.max(0, 1 - Math.abs(u) / 0.08)
+        lids.forEach((o) => {
+          if (o.userData.y) o.position.y = o.userData.y
+          else o.scale.y = Math.max(0.001, b)
+        })
+
+        // Both arms hanging completely straight down alongside the body - NOT bent, hands NOT touching
+        ;[armR, armL].forEach((a) => {
+          const s = a.s
+          a.sh.rotation.set(0, 0, s * 0.07)
+          a.el.rotation.set(0, 0, 0) // Elbow 100% straight
+          a.wr.rotation.set(0, 0, 0) // Wrist straight
+          for (let i = 0; i < 5; i++) {
+            curl(a.hand.f[i], 0.04, i === 0, s) // Open, naturally straight fingers
+          }
+        })
+      } else if (g === "HELLO") {
         // Dominant right hand raised to temple/forehead, waving outward with a friendly smile
         const wave = Math.sin(t * 6) * 0.18
         head.rotation.set(0.04, 0.05, 0)
@@ -978,10 +1249,23 @@ export default function ThreeAvatar({
     let animId: number
     let lastTime = performance.now()
 
+    const targetPos = new T.Vector3(...CAMERA_PRESETS[cameraPresetRef.current].pos)
+    const targetLook = new T.Vector3(...CAMERA_PRESETS[cameraPresetRef.current].look)
+    const currentLook = new T.Vector3(...CAMERA_PRESETS[cameraPresetRef.current].look)
+
     const loop = (now: number) => {
       animId = requestAnimationFrame(loop)
       const delta = Math.min(0.05, (now - lastTime) / 1000)
       lastTime = now
+
+      if (!isDragging) {
+        const targetPreset = CAMERA_PRESETS[cameraPresetRef.current] || CAMERA_PRESETS["upper-body"]
+        targetPos.set(...targetPreset.pos)
+        targetLook.set(...targetPreset.look)
+        camera.position.lerp(targetPos, 0.08)
+        currentLook.lerp(targetLook, 0.08)
+        camera.lookAt(currentLook)
+      }
 
       if (isPlayingRef.current) {
         timelineSecRef.current += delta * speedRef.current
@@ -1020,7 +1304,7 @@ export default function ThreeAvatar({
         stage.removeChild(renderer.domElement)
       }
     }
-  }, [])
+  }, [customizationKey, customizationTick])
 
   return (
     <div className="relative w-full rounded-2xl overflow-hidden border border-border/80 bg-slate-950 shadow-2xl flex flex-col">
@@ -1030,11 +1314,31 @@ export default function ThreeAvatar({
         className="w-full h-[400px] sm:h-[480px] cursor-grab active:cursor-grabbing relative"
       />
 
-      {/* Badges on stage */}
-      <div className="absolute top-3 left-3 pointer-events-none">
-        <span className="text-[11px] font-bold text-cyan-200 bg-slate-950/70 border border-cyan-500/40 px-3 py-1 rounded-full backdrop-blur-md">
-          BharatSign Bridge 3D Avatar
-        </span>
+      {/* Multi-Camera View Preset Switcher */}
+      <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1 bg-slate-900/85 backdrop-blur-md p-1 rounded-xl border border-slate-700/80 z-20 shadow-lg">
+        {[
+          { key: "full-body", label: "Full Body" },
+          { key: "upper-body", label: "Upper Body" },
+          { key: "hands", label: "Both Hands" },
+          { key: "right-hand", label: "Right Hand" },
+          { key: "left-hand", label: "Left Hand" },
+          { key: "face", label: "Face View" },
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => {
+              setCameraPreset(key as CameraPreset)
+              cameraPresetRef.current = key as CameraPreset
+            }}
+            className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all ${
+              cameraPreset === key
+                ? "bg-cyan-500 text-slate-950 shadow-sm font-extrabold"
+                : "text-slate-300 hover:text-white hover:bg-slate-800"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="absolute top-3 right-3 pointer-events-none">
@@ -1047,6 +1351,8 @@ export default function ThreeAvatar({
       <div className="absolute left-0 right-0 bottom-16 sm:bottom-14 px-4 py-2 text-center text-xs font-bold text-white bg-gradient-to-t from-slate-950/90 to-transparent pointer-events-none">
         {currentGesture === "DEMO_10S"
           ? phaseText
+          : currentGesture === "STAND_STRAIGHT" || currentGesture === "IDLE" || currentGesture === "STRAIGHT"
+          ? "Posture: Standing Straight (Natural Arms Rest)"
           : `Procedural Sign Articulation: ${currentGesture.replace(/_/g, " ")}`}
       </div>
 

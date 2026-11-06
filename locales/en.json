@@ -1,0 +1,51 @@
+{
+  "code": "en",
+  "name": "English",
+  "native": "English",
+  "bcp47": "en-IN",
+  "ui": {
+    "siteTitle": "BharatSign Bridge 2.0",
+    "siteSubtitle": "Research-Grade Indian Sign Language (ISL) AI Communication Platform",
+    "nav": {
+      "home": "Home",
+      "about": "About",
+      "communication": "Communication",
+      "translate": "Text to ISL",
+      "speechToIsl": "Speech to ISL",
+      "islToText": "Sign to Text",
+      "liveCamera": "Live Camera",
+      "conversation": "Conversation Room",
+      "learning": "Learning Portal",
+      "alphabet": "Alphabets (A–Z)",
+      "numbers": "Numbers (0–9)",
+      "words": "Vocabulary",
+      "practice": "Practice Room",
+      "research": "Research",
+      "settings": "Settings",
+      "expertReview": "Expert Review"
+    },
+    "hero": {
+      "badge": "ISLRTC & Ministry of Social Justice Aligned",
+      "title": "Bridging India Through Indian Sign Language AI",
+      "description": "A research-grade multimodal ecosystem uniting realistic 3D human signing avatars, temporal MediaPipe camera recognition, and 13 Indian spoken languages.",
+      "startTranslating": "Start Translating",
+      "exploreLearning": "Explore Learning Academy",
+      "viewResearch": "Research & Datasets"
+    },
+    "common": {
+      "play": "Play Sign",
+      "pause": "Pause",
+      "replay": "Replay",
+      "slowMotion": "Slow Motion (0.5x)",
+      "fullSpeed": "Normal (1.0x)",
+      "twoHanded": "Two-Handed Sign",
+      "oneHanded": "One-Handed Sign",
+      "viewPoster": "View Official ISLRTC Reference Poster",
+      "hearPronunciation": "Pronounce",
+      "confidence": "AI Confidence",
+      "cameraStart": "Start Camera",
+      "cameraStop": "Stop Camera",
+      "privacyNotice": "Camera processing runs 100% locally on your device. Video frames are never stored or transmitted to external servers."
+    }
+  }
+}

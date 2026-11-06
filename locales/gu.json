@@ -1,0 +1,51 @@
+{
+  "code": "gu",
+  "name": "Gujarati",
+  "native": "ગુજરાતી",
+  "bcp47": "gu-IN",
+  "ui": {
+    "siteTitle": "ભારતસાઇન બ્રિજ 2.0",
+    "siteSubtitle": "સંશોધન-સ્તરીય ભારતીય સાંકેતિક ભાષા (ISL) AI સંચાર પ્લેટફોર્મ",
+    "nav": {
+      "home": "હોમ",
+      "about": "પરિચય",
+      "communication": "સંચાર",
+      "translate": "ટેક્સ્ટથી ISL",
+      "speechToIsl": "અવાજથી ISL",
+      "islToText": "સંકેતથી ટેક્સ્ટ",
+      "liveCamera": "લાઇવ કેમેરા શોધ",
+      "conversation": "દ્વિપક્ષીય સંવાદ રૂમ",
+      "learning": "શિક્ષણ પોર્ટલ",
+      "alphabet": "મૂળાક્ષરો (A–Z)",
+      "numbers": "અંકો (0–9)",
+      "words": "શબ્દભંડોળ",
+      "practice": "પ્રેક્ટિસ રૂમ",
+      "research": "સંશોધન",
+      "settings": "સેટિંગ્સ",
+      "expertReview": "નિષ્ણાત સમીક્ષા"
+    },
+    "hero": {
+      "badge": "ISLRTC અને સામાજિક ન્યાય મંત્રાલય દ્વારા માન્ય",
+      "title": "ભારતીય સાંકેતિક ભાષા AI દ્વારા ભારતનું જોડાણ",
+      "description": "વાસ્તવિક 3D માનવ અવતાર, ટેમ્પોરલ કેમેરા દ્રષ્ટિ અને 13 ભારતીય ભાષાઓને જોડતું સંશોધન ઇકોસિસ્ટમ.",
+      "startTranslating": "અનુવાદ શરૂ કરો",
+      "exploreLearning": "શિક્ષણ પોર્ટલ જુઓ",
+      "viewResearch": "સંશોધન અને ડેટાસેટ"
+    },
+    "common": {
+      "play": "સંકેત ચલાવો",
+      "pause": "અટકાવો",
+      "replay": "ફરીથી ચલાવો",
+      "slowMotion": "ધીમી ગતિ (0.5x)",
+      "fullSpeed": "સામાન્ય (1.0x)",
+      "twoHanded": "બે હાથનો સંકેત",
+      "oneHanded": "એક હાથનો સંકેત",
+      "viewPoster": "સત્તાવાર ISLRTC ચાર્ટ જુઓ",
+      "hearPronunciation": "ઉચ્ચાર સાંભળો",
+      "confidence": "AI ચોકસાઈ",
+      "cameraStart": "કેમેરા શરૂ કરો",
+      "cameraStop": "કેમેરા બંધ કરો",
+      "privacyNotice": "કેમેરા પ્રોસેસિંગ તમારા ડિવાઇસ પર સ્થાનિક રીતે ચાલે છે. કોઈપણ વિડિયો ડેટા બાહ્ય સર્વર પર મોકલવામાં આવતો નથી."
+    }
+  }
+}

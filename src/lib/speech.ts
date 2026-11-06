@@ -10,9 +10,9 @@ export interface IndicLanguage {
 }
 
 export const INDIC_LANGUAGES: IndicLanguage[] = [
-  { code: "gu", name: "Gujarati", native: "ગુજરાતી", bcp47: "gu-IN" },
-  { code: "hi", name: "Hindi", native: "हिन्दी", bcp47: "hi-IN" },
   { code: "en", name: "English", native: "English", bcp47: "en-IN" },
+  { code: "hi", name: "Hindi", native: "हिन्दी", bcp47: "hi-IN" },
+  { code: "gu", name: "Gujarati", native: "ગુજરાતી", bcp47: "gu-IN" },
   { code: "mr", name: "Marathi", native: "मराठी", bcp47: "mr-IN" },
   { code: "bn", name: "Bengali", native: "বাংলা", bcp47: "bn-IN" },
   { code: "ta", name: "Tamil", native: "தமிழ்", bcp47: "ta-IN" },
@@ -47,51 +47,54 @@ function playAudioTone(frequency = 440, duration = 0.3) {
 }
 
 /**
- * Speaks text in any of the 13 supported languages using Web Speech API
+ * Sanitizes speech text so that TTS engines NEVER vocalize the word "slash" (or "स्लैश")
+ * in any of the 13 Indian languages or AI chat synthesis.
+ * Replaces slashes ('/' and '\') with natural speech pauses (', ') so speech flows smoothly without saying 'slash'.
  */
-export function speakText(
-  text: string,
-  langCode: string = "gu",
+export function cleanSpeechText(rawText: string): string {
+  if (!rawText) return ""
+
+  return rawText
+    // Replace slash and backslash with a natural pause (comma-space)
+    .replace(/\s*[\/\\]+\s*/g, ", ")
+    // Remove any accidental spoken words for slash if encountered
+    .replace(/\b(slash|backslash)\b/gi, "")
+    // Clean up duplicate commas, spaces, or leading/trailing punctuation
+    .replace(/\s*,\s*,\s*/g, ", ")
+    .replace(/\s+/g, " ")
+    .replace(/^[,.\s]+/, "")
+    .replace(/[,.\s]+$/, "")
+    .trim()
+}
+
+let currentAudioElement: HTMLAudioElement | null = null
+
+/**
+ * Stops any currently active speech synthesis or audio streaming
+ */
+export function stopSpeech(): void {
+  if (typeof window !== "undefined") {
+    if (currentAudioElement) {
+      currentAudioElement.pause()
+      currentAudioElement.currentTime = 0
+      currentAudioElement = null
+    }
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel()
+    }
+  }
+}
+
+/**
+ * Fallback to browser Web Speech API with smart Indic voice matching
+ */
+function fallbackWebSpeech(
+  sanitizedText: string,
+  langCode: string,
   onStart?: () => void,
   onEnd?: () => void
 ): boolean {
-  if (!text || typeof window === "undefined") return false
-
-  if ("speechSynthesis" in window) {
-    window.speechSynthesis.cancel() // Stop any current speech
-
-    const utterance = new SpeechSynthesisUtterance(text)
-    const langObj = INDIC_LANGUAGES.find((l) => l.code === langCode) || INDIC_LANGUAGES[0]
-    utterance.lang = langObj.bcp47
-    utterance.rate = 0.95
-    utterance.pitch = 1.0
-
-    // Look for exact voice match
-    const voices = window.speechSynthesis.getVoices()
-    const matchedVoice = voices.find(
-      (v) =>
-        v.lang === langObj.bcp47 ||
-        v.lang.startsWith(langObj.code) ||
-        v.name.toLowerCase().includes(langObj.name.toLowerCase())
-    )
-
-    if (matchedVoice) {
-      utterance.voice = matchedVoice
-    }
-
-    if (onStart) utterance.onstart = onStart
-    utterance.onend = () => {
-      if (onEnd) onEnd()
-    }
-    utterance.onerror = () => {
-      playAudioTone(520, 0.4)
-      if (onEnd) onEnd()
-    }
-
-    window.speechSynthesis.speak(utterance)
-    return true
-  } else {
-    // Fallback tone
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
     playAudioTone(480, 0.5)
     if (onStart) onStart()
     setTimeout(() => {
@@ -99,13 +102,106 @@ export function speakText(
     }, 1000)
     return false
   }
+
+  window.speechSynthesis.cancel()
+  const utterance = new SpeechSynthesisUtterance(sanitizedText)
+  const langObj = INDIC_LANGUAGES.find((l) => l.code === langCode) || INDIC_LANGUAGES[0]
+  utterance.lang = langObj.bcp47
+  utterance.rate = 0.95
+  utterance.pitch = 1.0
+
+  const voices = window.speechSynthesis.getVoices()
+  // Look for exact match or regional Indic match
+  const matchedVoice =
+    voices.find(
+      (v) =>
+        v.lang === langObj.bcp47 ||
+        v.lang.startsWith(langObj.code) ||
+        v.name.toLowerCase().includes(langObj.name.toLowerCase())
+    ) ||
+    voices.find((v) => v.lang.includes("hi-IN") || v.lang.includes("en-IN") || v.lang.includes("IN")) ||
+    voices[0]
+
+  if (matchedVoice) {
+    utterance.voice = matchedVoice
+  }
+
+  if (onStart) utterance.onstart = onStart
+  utterance.onend = () => {
+    if (onEnd) onEnd()
+  }
+  utterance.onerror = () => {
+    playAudioTone(520, 0.3)
+    if (onEnd) onEnd()
+  }
+
+  window.speechSynthesis.speak(utterance)
+  return true
+}
+
+/**
+ * Speaks text in any of the 13 supported languages.
+ * Uses high-fidelity native acoustic audio from backend TTS (/api/tts)
+ * with automatic fallback to Web Speech API.
+ */
+export function speakText(
+  text: string,
+  langCode: string = "en",
+  onStart?: () => void,
+  onEnd?: () => void
+): boolean {
+  if (!text || typeof window === "undefined") return false
+
+  const sanitizedText = cleanSpeechText(text)
+  if (!sanitizedText) return false
+
+  // Stop any ongoing speech
+  stopSpeech()
+
+  // 1. Try High-Quality Backend Audio TTS (guarantees native accent for all 13 languages)
+  try {
+    const ttsUrl = `http://127.0.0.1:8000/api/tts?text=${encodeURIComponent(sanitizedText)}&lang=${encodeURIComponent(langCode)}`
+    const audio = new Audio(ttsUrl)
+    currentAudioElement = audio
+
+    let triggeredStart = false
+
+    audio.onplay = () => {
+      triggeredStart = true
+      if (onStart) onStart()
+    }
+
+    audio.onended = () => {
+      currentAudioElement = null
+      if (onEnd) onEnd()
+    }
+
+    audio.onerror = () => {
+      currentAudioElement = null
+      if (!triggeredStart) {
+        fallbackWebSpeech(sanitizedText, langCode, onStart, onEnd)
+      }
+    }
+
+    const playPromise = audio.play()
+    if (playPromise !== undefined) {
+      playPromise.catch(() => {
+        // In case of browser autoplay blocking or network glitch, fallback seamlessly
+        currentAudioElement = null
+        fallbackWebSpeech(sanitizedText, langCode, onStart, onEnd)
+      })
+    }
+    return true
+  } catch {
+    return fallbackWebSpeech(sanitizedText, langCode, onStart, onEnd)
+  }
 }
 
 /**
  * Speech Recognition (Microphone) helper supporting 13 languages
  */
 export function createSpeechRecognizer(
-  langCode: string = "gu",
+  langCode: string = "en",
   onResult: (transcript: string) => void,
   onError?: (err: unknown) => void,
   onEnd?: () => void

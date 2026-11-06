@@ -1,0 +1,30 @@
+{
+  "short_name": "BharatSign",
+  "name": "BharatSign-Bridge | Indian Sign Language AI",
+  "description": "Multimodal Indian Sign Language AI Ecosystem with real-time recognition, 3D procedural kinematics, and verified certificates.",
+  "icons": [
+    {
+      "src": "/logo-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#010b1a",
+  "theme_color": "#03152e",
+  "display": "standalone",
+  "orientation": "portrait-primary"
+}
