@@ -352,6 +352,16 @@ def test_social_login_google_and_github():
     assert gh_data["user"]["email"] == test_gh_email
     assert gh_data["user"]["name"] == "GitHub Contributor"
 
+def test_oauth_config_endpoint():
+    res = client.get("/api/auth/oauth/config")
+    assert res.status_code == 200
+    data = res.json()
+    assert "google" in data
+    assert "github" in data
+    assert "enabled" in data["google"]
+    assert "enabled" in data["github"]
+    assert "app_base_url" in data
+
 
 if __name__ == "__main__":
     tests = [
@@ -377,6 +387,7 @@ if __name__ == "__main__":
         test_leaderboard_does_not_leak_emails,
         test_translate_gibberish_returns_no_match,
         test_social_login_google_and_github,
+        test_oauth_config_endpoint,
     ]
 
     passed = 0

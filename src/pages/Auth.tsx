@@ -96,6 +96,10 @@ export default function Auth() {
   const [socialName, setSocialName] = useState("")
   const [isSocialSubmitting, setIsSocialSubmitting] = useState(false)
   const [socialError, setSocialError] = useState<string | null>(null)
+  const [oauthConfig, setOauthConfig] = useState<{
+    google?: { enabled: boolean; client_id: string }
+    github?: { enabled: boolean; client_id: string }
+  } | null>(null)
 
   const { login } = useAuthAndTheme()
   const navigate = useNavigate()
@@ -104,9 +108,48 @@ export default function Auth() {
   // Target route to return after successful authentication
   const from = (location.state as any)?.from?.pathname || "/profile"
 
-  const handleOpenSocialModal = (provider: "google" | "github") => {
-    setSocialProvider(provider)
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/auth/oauth/config`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setOauthConfig(data)
+      })
+      .catch(() => {})
+  }, [])
+
+  const handleInitiateOAuth = (provider: "google" | "github") => {
     setSocialError(null)
+
+    // If live Google OAuth credentials exist in .env, redirect directly to Google consent
+    if (provider === "google" && oauthConfig?.google?.enabled && oauthConfig.google.client_id) {
+      const redirectUri = `${window.location.origin}/auth/callback`
+      const params = new URLSearchParams({
+        client_id: oauthConfig.google.client_id,
+        redirect_uri: redirectUri,
+        response_type: "code",
+        scope: "openid email profile",
+        state: "google",
+        prompt: "select_account",
+      })
+      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
+      return
+    }
+
+    // If live GitHub OAuth credentials exist in .env, redirect directly to GitHub authorization
+    if (provider === "github" && oauthConfig?.github?.enabled && oauthConfig.github.client_id) {
+      const redirectUri = `${window.location.origin}/auth/callback`
+      const params = new URLSearchParams({
+        client_id: oauthConfig.github.client_id,
+        redirect_uri: redirectUri,
+        scope: "read:user user:email",
+        state: "github",
+      })
+      window.location.href = `https://github.com/login/oauth/authorize?${params.toString()}`
+      return
+    }
+
+    // Otherwise open the interactive authorization modal
+    setSocialProvider(provider)
     const baseEmail = email.trim().toLowerCase()
     if (provider === "google") {
       setSocialEmail(baseEmail && baseEmail.includes("@") ? baseEmail : "student@gmail.com")
@@ -575,7 +618,7 @@ export default function Auth() {
             <div className="grid grid-cols-2 gap-2.5 mb-2">
               <button
                 type="button"
-                onClick={() => handleOpenSocialModal("google")}
+                onClick={() => handleInitiateOAuth("google")}
                 className="h-10 px-3 rounded-[13px] border border-[#d8e0f2] dark:border-[#222b4a] bg-[#f9fbfd] dark:bg-[#151b36] hover:bg-[#edf2fa] dark:hover:bg-[#1a2347] hover:border-[#4285F4]/50 text-[#0e1430] dark:text-[#eef1ff] text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 shadow-xs group cursor-pointer"
               >
                 <GoogleIcon className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" />
@@ -584,7 +627,7 @@ export default function Auth() {
 
               <button
                 type="button"
-                onClick={() => handleOpenSocialModal("github")}
+                onClick={() => handleInitiateOAuth("github")}
                 className="h-10 px-3 rounded-[13px] border border-[#d8e0f2] dark:border-[#222b4a] bg-[#f9fbfd] dark:bg-[#151b36] hover:bg-[#edf2fa] dark:hover:bg-[#1a2347] hover:border-gray-400 dark:hover:border-gray-500 text-[#0e1430] dark:text-[#eef1ff] text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 shadow-xs group cursor-pointer"
               >
                 <GitHubIcon className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" />
@@ -819,7 +862,7 @@ export default function Auth() {
             </button>
 
             {/* Provider Header */}
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-3 mb-3">
               <div className="w-11 h-11 rounded-xl bg-[#f3f5fb] dark:bg-[#151b36] border border-[#d8e0f2] dark:border-[#222b4a] flex items-center justify-center shadow-xs">
                 {socialProvider === "google" ? (
                   <GoogleIcon className="w-6 h-6" />
@@ -835,6 +878,17 @@ export default function Auth() {
                   {isSignUp ? "Create a verified account" : "Sign in to your learning account"}
                 </p>
               </div>
+            </div>
+
+            {/* OAuth Info Banner */}
+            <div className="mb-4 p-3 rounded-xl bg-[#2f4bff]/5 dark:bg-[#2f4bff]/10 border border-[#2f4bff]/20 text-xs text-left">
+              <div className="flex items-center gap-1.5 font-bold text-[#2f4bff] dark:text-[#60a5fa] mb-1">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>OAuth 2.0 Secure Authorization</span>
+              </div>
+              <p className="text-[11px] text-[#586082] dark:text-[#828bb4] leading-relaxed">
+                Connect your account or authorize with one-click profile credentials below. All authorizations issue cryptographic HMAC-SHA256 session tokens.
+              </p>
             </div>
 
             {socialError && (

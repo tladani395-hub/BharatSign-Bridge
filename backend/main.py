@@ -42,6 +42,12 @@ ALLOWED_ORIGINS = [
     if o.strip()
 ]
 
+APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:5173").rstrip("/")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
+GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "").strip()
+GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "").strip()
+
 # Track consumed single-use captcha tokens to prevent replay attacks
 USED_CAPTCHA_TOKENS: set = set()
 
@@ -1014,6 +1020,16 @@ class SocialLoginRequest(BaseModel):
     name: Optional[str] = ""
     avatar_url: Optional[str] = ""
 
+class GoogleOAuthRequest(BaseModel):
+    credential: Optional[str] = None  # Google GSI ID Token
+    code: Optional[str] = None        # OAuth Authorization Code
+    redirect_uri: Optional[str] = None
+
+class GitHubOAuthRequest(BaseModel):
+    code: str                         # GitHub OAuth Authorization Code
+    redirect_uri: Optional[str] = None
+
+
 
 class SyncProgressRequest(BaseModel):
     email: str
@@ -1241,30 +1257,14 @@ def login_user(req: LoginRequest, request: Request):
         "token": token
     }
 
-@app.post("/api/auth/social-login")
-def social_login(req: SocialLoginRequest, request: Request):
+def process_social_account_login(provider: str, clean_email: str, raw_name: str, avatar_url: str, client_ip: str):
     """
-    Handles authentication and registration via Google and GitHub providers.
+    Unified helper to authenticate or provision a user from a verified social identity (Google/GitHub).
     Issues cryptographically signed HMAC-SHA256 JWT tokens.
-    If the account exists in SQLite, signs the user in directly.
-    If the account does not exist, provisions a new student account with a secure unguessable bcrypt password.
     """
-    provider = req.provider.strip().lower()
-    if provider not in ("google", "github"):
-        raise HTTPException(
-            status_code=400,
-            detail="Unsupported identity provider. Only 'google' and 'github' are supported."
-        )
-
-    clean_email = req.email.strip().lower()
-    if not clean_email or "@" not in clean_email or "." not in clean_email.split("@")[-1]:
-        raise HTTPException(
-            status_code=400,
-            detail="A valid email address is required for social authentication."
-        )
-
-    raw_name = req.name.strip() if req.name and req.name.strip() else ("Google User" if provider == "google" else "GitHub Developer")
-    clean_name = re.sub(r'<[^>]+>', '', raw_name)[:100].strip() or "ISL Student"
+    clean_name = re.sub(r'<[^>]+>', '', raw_name)[:100].strip() if raw_name else ("Google User" if provider == "google" else "GitHub Developer")
+    if not clean_name:
+        clean_name = "ISL Student"
 
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
@@ -1280,13 +1280,12 @@ def social_login(req: SocialLoginRequest, request: Request):
         user_data = dict(user_row)
         user_id = user_data["id"]
 
-        # Update last_active_date and optionally avatar_url if provided and not set
-        if req.avatar_url and not user_data.get("avatar_url"):
+        if avatar_url and not user_data.get("avatar_url"):
             cursor.execute(
                 "UPDATE users SET last_active_date = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (today_iso, req.avatar_url.strip(), user_id)
+                (today_iso, avatar_url.strip(), user_id)
             )
-            user_data["avatar_url"] = req.avatar_url.strip()
+            user_data["avatar_url"] = avatar_url.strip()
         else:
             cursor.execute(
                 "UPDATE users SET last_active_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -1294,7 +1293,6 @@ def social_login(req: SocialLoginRequest, request: Request):
             )
         conn.commit()
 
-        # Check whether user has configured security questions
         cursor.execute("SELECT id FROM user_security_questions WHERE user_id = ?", (user_id,))
         has_security_questions = cursor.fetchone() is not None
         conn.close()
@@ -1305,7 +1303,7 @@ def social_login(req: SocialLoginRequest, request: Request):
         record_security_audit_event(
             user_id,
             f"social_login_{provider}",
-            request.client.host if request.client else "127.0.0.1",
+            client_ip,
             f"Provider: {provider}, email: {clean_email}"
         )
 
@@ -1331,12 +1329,10 @@ def social_login(req: SocialLoginRequest, request: Request):
             "token": token
         }
     else:
-        # Register new student account via Social Auth
         user_id = f"user_{uuid.uuid4().hex[:10]}"
-        # Generate cryptographically secure random password so account is unguessable via credential stuffing
         random_pass = secrets.token_urlsafe(32)
         pwd_hash = hash_password(random_pass)
-        avatar = req.avatar_url.strip() if (req.avatar_url and req.avatar_url.startswith(("https://", "data:image/"))) else ""
+        avatar = avatar_url.strip() if (avatar_url and avatar_url.startswith(("https://", "data:image/"))) else ""
 
         try:
             cursor.execute("""
@@ -1361,7 +1357,7 @@ def social_login(req: SocialLoginRequest, request: Request):
         record_security_audit_event(
             user_id,
             f"social_signup_{provider}",
-            request.client.host if request.client else "127.0.0.1",
+            client_ip,
             f"Provider: {provider}, email: {clean_email}"
         )
 
@@ -1386,6 +1382,185 @@ def social_login(req: SocialLoginRequest, request: Request):
             },
             "token": token
         }
+
+@app.get("/api/auth/oauth/config")
+def get_oauth_config():
+    """
+    Returns public OAuth configuration and client IDs so frontend can initiate
+    live Google and GitHub OAuth consent flows.
+    """
+    return {
+        "google": {
+            "enabled": bool(GOOGLE_CLIENT_ID),
+            "client_id": GOOGLE_CLIENT_ID,
+        },
+        "github": {
+            "enabled": bool(GITHUB_CLIENT_ID),
+            "client_id": GITHUB_CLIENT_ID,
+        },
+        "app_base_url": APP_BASE_URL
+    }
+
+@app.post("/api/auth/social-login")
+def social_login(req: SocialLoginRequest, request: Request):
+    """
+    Direct social login/registration endpoint.
+    Used by client UI for authorized provider flows or verified social identities.
+    """
+    provider = req.provider.strip().lower()
+    if provider not in ("google", "github"):
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported identity provider. Only 'google' and 'github' are supported."
+        )
+
+    clean_email = req.email.strip().lower()
+    if not clean_email or "@" not in clean_email or "." not in clean_email.split("@")[-1]:
+        raise HTTPException(
+            status_code=400,
+            detail="A valid email address is required for social authentication."
+        )
+
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    return process_social_account_login(provider, clean_email, req.name or "", req.avatar_url or "", client_ip)
+
+@app.post("/api/auth/oauth/google")
+def oauth_google_authorize(req: GoogleOAuthRequest, request: Request):
+    """
+    Exchanges Google OAuth 2.0 credential or authorization code for user profile
+    and issues an authenticated BharatSign JWT token.
+    """
+    client_ip = request.client.host if request.client else "127.0.0.1"
+
+    if req.credential:
+        try:
+            res = requests.get(
+                f"https://oauth2.googleapis.com/tokeninfo?id_token={req.credential}",
+                timeout=10
+            )
+            if res.status_code != 200:
+                raise HTTPException(status_code=401, detail="Invalid Google ID token or verification rejected by Google.")
+            token_data = res.json()
+            email = token_data.get("email", "").strip().lower()
+            if not email:
+                raise HTTPException(status_code=400, detail="Google account did not return a verified email.")
+            name = token_data.get("name") or "Google Learner"
+            avatar = token_data.get("picture", "")
+            return process_social_account_login("google", email, name, avatar, client_ip)
+        except requests.RequestException as e:
+            raise HTTPException(status_code=502, detail=f"Unable to contact Google OAuth servers: {str(e)}")
+
+    elif req.code:
+        if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+            raise HTTPException(
+                status_code=500,
+                detail="Google OAuth is not configured on the server. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env."
+            )
+        try:
+            token_res = requests.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "code": req.code,
+                    "client_id": GOOGLE_CLIENT_ID,
+                    "client_secret": GOOGLE_CLIENT_SECRET,
+                    "redirect_uri": req.redirect_uri or f"{APP_BASE_URL}/auth/callback",
+                    "grant_type": "authorization_code",
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=10
+            )
+            if token_res.status_code != 200:
+                raise HTTPException(status_code=400, detail=f"Google OAuth token exchange failed: {token_res.text}")
+            token_json = token_res.json()
+            access_token = token_json.get("access_token")
+
+            userinfo_res = requests.get(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10
+            )
+            if userinfo_res.status_code != 200:
+                raise HTTPException(status_code=400, detail="Failed to fetch user profile from Google.")
+            user_info = userinfo_res.json()
+            email = user_info.get("email", "").strip().lower()
+            name = user_info.get("name") or "Google Learner"
+            avatar = user_info.get("picture", "")
+            return process_social_account_login("google", email, name, avatar, client_ip)
+        except requests.RequestException as e:
+            raise HTTPException(status_code=502, detail=f"Unable to complete Google OAuth exchange: {str(e)}")
+    else:
+        raise HTTPException(status_code=400, detail="Missing Google authorization credential or code.")
+
+@app.post("/api/auth/oauth/github")
+def oauth_github_authorize(req: GitHubOAuthRequest, request: Request):
+    """
+    Exchanges GitHub OAuth 2.0 authorization code for user profile & verified email,
+    and issues an authenticated BharatSign JWT token.
+    """
+    client_ip = request.client.host if request.client else "127.0.0.1"
+
+    if not GITHUB_CLIENT_ID or not GITHUB_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=500,
+            detail="GitHub OAuth is not configured on the server. Please set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in .env."
+        )
+
+    if not req.code:
+        raise HTTPException(status_code=400, detail="GitHub authorization code is required.")
+
+    try:
+        token_res = requests.post(
+            "https://github.com/login/oauth/access_token",
+            headers={"Accept": "application/json"},
+            data={
+                "client_id": GITHUB_CLIENT_ID,
+                "client_secret": GITHUB_CLIENT_SECRET,
+                "code": req.code,
+                "redirect_uri": req.redirect_uri or f"{APP_BASE_URL}/auth/callback",
+            },
+            timeout=10
+        )
+        if token_res.status_code != 200:
+            raise HTTPException(status_code=400, detail=f"GitHub token exchange failed: {token_res.text}")
+
+        token_data = token_res.json()
+        access_token = token_data.get("access_token")
+        if not access_token:
+            err_desc = token_data.get("error_description") or token_data.get("error") or "Failed to obtain GitHub access token."
+            raise HTTPException(status_code=400, detail=f"GitHub OAuth error: {err_desc}")
+
+        gh_headers = {
+            "Authorization": f"Bearer {access_token}",
+            "User-Agent": "BharatSign-Bridge/1.0",
+            "Accept": "application/vnd.github+json"
+        }
+        user_res = requests.get("https://api.github.com/user", headers=gh_headers, timeout=10)
+        if user_res.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to fetch GitHub profile.")
+
+        user_info = user_res.json()
+        email = (user_info.get("email") or "").strip().lower()
+
+        if not email:
+            emails_res = requests.get("https://api.github.com/user/emails", headers=gh_headers, timeout=10)
+            if emails_res.status_code == 200:
+                for entry in emails_res.json():
+                    if entry.get("primary") and entry.get("verified"):
+                        email = entry.get("email", "").strip().lower()
+                        break
+                    elif entry.get("verified") and not email:
+                        email = entry.get("email", "").strip().lower()
+
+        if not email:
+            login_handle = user_info.get("login", "developer")
+            email = f"{login_handle}@users.noreply.github.com"
+
+        name = user_info.get("name") or user_info.get("login") or "GitHub Developer"
+        avatar = user_info.get("avatar_url") or ""
+
+        return process_social_account_login("github", email, name, avatar, client_ip)
+    except requests.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"Unable to communicate with GitHub OAuth service: {str(e)}")
 
 @app.post("/api/auth/sync-progress")
 def sync_progress(req: SyncProgressRequest, current_user: dict = Depends(get_current_user)):

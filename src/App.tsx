@@ -15,6 +15,7 @@ const LiveCamera = lazy(() => import("@/pages/LiveCamera"))
 const Conversation = lazy(() => import("@/pages/Conversation"))
 const PublicDesk = lazy(() => import("@/pages/PublicDesk"))
 const Auth = lazy(() => import("@/pages/Auth"))
+const AuthCallback = lazy(() => import("@/pages/AuthCallback"))
 const Profile = lazy(() => import("@/pages/Profile"))
 const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"))
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"))
@@ -79,6 +80,7 @@ export default function App() {
               />
               <Route path="/about" element={<About />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/login" element={<Navigate to="/auth" replace />} />
               <Route path="/security-setup" element={<SecuritySetup />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
