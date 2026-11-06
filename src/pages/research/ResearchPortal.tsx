@@ -144,7 +144,7 @@ export default function ResearchPortal() {
                   Indian Sign Language (ISL) serves as the primary visual communication modality for an estimated 18 million deaf and hard-of-hearing citizens across the Indian subcontinent. Despite its linguistic significance, automated computational translation pipelines have traditionally suffered from high latency, rigid single-handed substitutions, and a lack of authentic 3D kinetic animation models. In this paper, we present <strong>BharatSign Bridge 2.0</strong>, a holistic, research-grade ISL communication ecosystem.
                 </p>
                 <p>
-                  Our framework incorporates three novel pillars: (1) an end-to-end client-side MediaPipe landmark extraction pipeline running at 45 FPS on standard web browsers with sub-50ms latency; (2) a procedurally rigged 3D South Asian avatar presenter capable of multi-camera inspection, independent distal and proximal interphalangeal finger articulators, and synchronized facial non-manual markers; and (3) a bidirectional natural language translation engine supporting 13 official Indian languages with automatic fingerspelling fallbacks for out-of-vocabulary named entities. Empirical evaluations against ISLRTC benchmark corpora demonstrate a 96.8% top-1 gesture classification accuracy while preserving strict WCAG 2.1 AAA accessibility standards.
+                  Our framework incorporates three novel pillars: (1) an end-to-end client-side MediaPipe landmark extraction pipeline running on standard web browsers with sub-50ms latency; (2) a procedurally rigged 3D South Asian avatar presenter capable of multi-camera inspection, independent distal and proximal interphalangeal finger articulators, and synchronized facial non-manual markers; and (3) a bidirectional natural language translation engine supporting official Indian languages with fingerspelling fallbacks for out-of-vocabulary named entities. Empirical baseline evaluations on synthesized ISLRTC benchmark test sets demonstrate 58.3% top-1 accuracy on 12-class dynamic gesture sequences and 49.5% on 36 static ISL alphabets/digits (as documented in our open evaluation report), highlighting the critical necessity for fluent native ISL signer motion-capture datasets for production deployment.
                 </p>
               </div>
 
@@ -229,15 +229,15 @@ export default function ResearchPortal() {
                 <span>Classification Accuracy on ISLRTC Corpus</span>
               </h3>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Comparative evaluations across state-of-the-art architectures evaluated on 48 ISL gesture classes.
+                Empirical baseline evaluation results across our dual-model ensemble documented in <code className="text-primary font-mono">ml/evaluation_report.json</code>.
               </p>
 
               <div className="flex flex-col gap-2.5 text-xs">
                 {[
-                  { model: "BharatSign ST-GCN + Temporal Filter (Our Platform)", acc: "96.8%", latency: "42ms" },
-                  { model: "MediaPipe Holistic + Multi-Layer Perceptron", acc: "93.4%", latency: "38ms" },
-                  { model: "2D CNN + Bidirectional LSTM", acc: "88.2%", latency: "95ms" },
-                  { model: "Static Frame ResNet-50", acc: "79.1%", latency: "140ms" },
+                  { model: "Model B: Dynamic Sequence Recognizer (12 classes, ISLRTC)", acc: "58.3% top-1", latency: "38ms" },
+                  { model: "Model A: Static Handshape Classifier (36 classes, A-Z / 0-9)", acc: "49.5% top-1", latency: "24ms" },
+                  { model: "Weighted F1 Score (Model B Dynamic Sequences)", acc: "58.5% F1", latency: "38ms" },
+                  { model: "Weighted F1 Score (Model A Static Handshapes)", acc: "49.5% F1", latency: "24ms" },
                 ].map((row, idx) => (
                   <div
                     key={idx}

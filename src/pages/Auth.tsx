@@ -194,7 +194,7 @@ export default function Auth() {
 
         // Success animation & Lock unlock (turns green and shows UNLOCKED)
         setIsUnlocked(true)
-        setPendingUserData(data.user)
+        setPendingUserData({ ...data.user, token: data.token })
 
         // Wait about 1 second, then show the full-screen welcome overlay
         setTimeout(() => {
@@ -222,7 +222,7 @@ export default function Auth() {
         // Unlock animation upon successful sign in!
         setIsUnlocked(true)
         setTimeout(() => {
-          login(data.user.name, data.user.email, data.user.preferredLanguage, data.user)
+          login(data.user.name, data.user.email, data.user.preferredLanguage, data.user, data.token)
           setIsLoading(false)
           if (data.user && data.user.hasSecurityQuestions === false) {
             navigate("/security-setup", { replace: true })
@@ -245,7 +245,8 @@ export default function Auth() {
         pendingUserData.name,
         pendingUserData.email,
         pendingUserData.preferredLanguage,
-        pendingUserData
+        pendingUserData,
+        (pendingUserData as any)?.token
       )
     }
     setIsLoading(false)

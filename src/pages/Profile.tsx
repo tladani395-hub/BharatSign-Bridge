@@ -121,9 +121,12 @@ export default function Profile() {
     if (!user) return
     updateProfile({ avatarUrl })
     try {
+      const token = localStorage.getItem("bharatsign_token")
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) headers["Authorization"] = `Bearer ${token}`
       await fetch("http://127.0.0.1:8000/api/auth/profile", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ email: user.email, avatar_url: avatarUrl }),
       })
       setStreakCelebration("📷 Profile Photo (DP) updated successfully!")
@@ -136,9 +139,12 @@ export default function Profile() {
     if (!user) return
     setIsSavingProfile(true)
     try {
+      const token = localStorage.getItem("bharatsign_token")
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) headers["Authorization"] = `Bearer ${token}`
       const res = await fetch("http://127.0.0.1:8000/api/auth/profile", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           email: user.email,
           name: editName.trim(),
@@ -231,9 +237,12 @@ export default function Profile() {
     if (!user) return
     setIsClaiming(true)
     try {
+      const token = localStorage.getItem("bharatsign_token")
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) headers["Authorization"] = `Bearer ${token}`
       const res = await fetch("http://127.0.0.1:8000/api/certificates/claim", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           user_id: user.id,
           user_name: user.name,

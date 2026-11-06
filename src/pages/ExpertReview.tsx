@@ -164,9 +164,12 @@ export default function ExpertReview() {
 
     // 3. Persist to Backend SQLite Database
     try {
+      const token = localStorage.getItem("bharatsign_token")
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) headers["Authorization"] = `Bearer ${token}`
       const res = await fetch("/api/reviews", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           sign_id: record.sign_id,
           gloss: record.gloss,

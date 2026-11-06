@@ -1758,10 +1758,10 @@ export default function LiveISLCameraStudio({
         })
           .then((res) => (res.ok ? res.json() : null))
           .then((data) => {
-            if (data && data.recognized) {
+            if (data && data.recognized && (data.confidence ?? 0) >= 0.60) {
               const matched = ISL_CLASSES.find((c) => c.id === data.sign_id)
               if (matched) {
-                setConfidence(data.confidence || 0.985)
+                setConfidence(data.confidence)
                 setIsSignRecognized(true)
                 setActiveSignClass(matched)
                 setDatabaseMatch({
@@ -1784,11 +1784,25 @@ export default function LiveISLCameraStudio({
                 if (consecutiveCountRef.current.signId === matched.id) {
                   consecutiveCountRef.current.count++
                   if (consecutiveCountRef.current.count === 3) {
-                    commitRecognizedSign(matched, data.confidence || 0.985)
+                    commitRecognizedSign(matched, data.confidence)
                   }
                 } else {
                   consecutiveCountRef.current = { signId: matched.id, count: 1 }
                 }
+              }
+            } else if (data) {
+              // Low confidence or uncertain: Show real probabilities without false commits
+              setConfidence(data.confidence || 0.0)
+              setIsSignRecognized(false)
+              if (data.candidates && data.candidates.length > 0) {
+                setCandidates(
+                  data.candidates.map((c: any) => ({
+                    signId: c.sign_id,
+                    gloss: c.gloss,
+                    name: c.name || c.gloss,
+                    probability: c.probability,
+                  }))
+                )
               }
             }
           })

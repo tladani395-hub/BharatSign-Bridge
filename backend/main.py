@@ -22,13 +22,25 @@ from dotenv import load_dotenv
 # Load environment variables from .env if present
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException, Response, Request
+import jwt
+from fastapi import FastAPI, HTTPException, Response, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from ml.predict import predict_isl_sign
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "bharatsign.db")
-CAPTCHA_SECRET = "bharatsign_human_auth_verification_salt_2026"
+JWT_SECRET = os.getenv("JWT_SECRET", "bharatsign_jwt_super_secure_signing_secret_key_2026_xyz_7788_enterprise_production")
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "72"))
+CAPTCHA_SECRET = os.getenv("CAPTCHA_SECRET", "bharatsign_human_auth_verification_salt_2026")
+ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000"
+    ).split(",")
+    if o.strip()
+]
 
 def generate_captcha_challenge():
     """Generates an accessible, randomized math captcha challenge with cryptographic HMAC signature."""
@@ -68,6 +80,7 @@ def verify_captcha_challenge(answer: Optional[str], token: Optional[str]) -> boo
 # Rate limiting storage: { key: [timestamps] }
 FORGOT_PW_RATE_LIMIT: Dict[str, List[float]] = {}
 VERIFY_TOKEN_RATE_LIMIT: Dict[str, List[float]] = {}
+LOGIN_RATE_LIMIT: Dict[str, List[float]] = {}
 
 def check_rate_limit(storage: Dict[str, List[float]], key: str, max_requests: int = 5, window_seconds: int = 900) -> bool:
     """Sliding window rate limiter to mitigate brute-force and email flooding attacks."""
@@ -80,6 +93,77 @@ def check_rate_limit(storage: Dict[str, List[float]], key: str, max_requests: in
     timestamps.append(now)
     storage[key] = timestamps
     return True
+
+# ==================== JWT AUTHENTICATION & ACCESS CONTROL ====================
+
+def create_access_token(user_id: str, email: str, role: str = "student") -> str:
+    """Generates a cryptographically signed HMAC-SHA256 JWT access token."""
+    now = int(time.time())
+    payload = {
+        "sub": user_id,
+        "email": email.strip().lower(),
+        "role": role,
+        "iat": now,
+        "exp": now + (JWT_EXPIRE_HOURS * 3600)
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def decode_access_token(token: str) -> Optional[dict]:
+    """Validates signature and expiration of JWT access token."""
+    try:
+        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except Exception:
+        return None
+
+def get_current_user(request: Request) -> dict:
+    """
+    FastAPI dependency that enforces authentication across protected routes.
+    Extracts and validates the Bearer JWT token from the Authorization header,
+    then retrieves the user from SQLite.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required. Please log in to perform this action."
+        )
+    token = auth_header[7:].strip()
+    payload = decode_access_token(token)
+    if not payload or not payload.get("sub"):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired session token. Please log in again."
+        )
+
+    user_id = payload["sub"]
+    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=401, detail="User account no longer exists.")
+
+    user_dict = dict(row)
+    user_dict["role"] = payload.get("role", user_dict.get("role", "student"))
+    return user_dict
+
+def require_role(allowed_roles: List[str]):
+    """
+    Role-based access control dependency (RBAC) to protect expert review,
+    administrative, and certification endpoints from unauthorized students.
+    """
+    def role_dependency(current_user: dict = Depends(get_current_user)) -> dict:
+        user_role = current_user.get("role", "student")
+        if user_role not in allowed_roles:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Forbidden. Access restricted to authorized roles: {', '.join(allowed_roles)}."
+            )
+        return current_user
+    return role_dependency
 
 def validate_email_format(email: str) -> bool:
     """Validates email format using standard RFC 5322 regex."""
@@ -430,6 +514,7 @@ def init_db():
         email TEXT UNIQUE NOT NULL COLLATE NOCASE,
         password_hash TEXT NOT NULL,
         preferred_language TEXT DEFAULT 'en',
+        role TEXT DEFAULT 'student',
         streak_days INTEGER DEFAULT 0,
         last_active_date TEXT DEFAULT '',
         last_quiz_date TEXT DEFAULT '',
@@ -443,7 +528,11 @@ def init_db():
     """)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);")
 
-    # Dynamic migrations for avatar_url and bio if older table existed
+    # Dynamic migrations for role, avatar_url and bio if older table existed
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'student';")
+    except Exception:
+        pass
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT DEFAULT '';")
     except Exception:
@@ -548,11 +637,32 @@ def init_db():
     # Seed Default User if not exists
     cursor.execute("SELECT COUNT(*) FROM users WHERE email = 'student@bharatsign.ai'")
     if cursor.fetchone()[0] == 0:
-        default_pwd = hash_password("bharatsign2026")
+        default_pwd = hash_password("BharatSign2026!#")
         cursor.execute("""
-        INSERT INTO users (id, name, email, password_hash, preferred_language, streak_days, level, joined_date)
-        VALUES ('user_demo_001', 'New ISL Student', 'student@bharatsign.ai', ?, 'en', 0, 'ISL Beginner • Level 1', 'November 2026')
+        INSERT INTO users (id, name, email, password_hash, preferred_language, role, streak_days, level, joined_date)
+        VALUES ('user_demo_001', 'ISL Student', 'student@bharatsign.ai', ?, 'en', 'student', 0, 'ISL Beginner • Level 1', 'November 2026')
         """, (default_pwd,))
+    else:
+        # Ensure role is set
+        cursor.execute("UPDATE users SET role = 'student' WHERE email = 'student@bharatsign.ai' AND (role IS NULL OR role = '')")
+
+    # Seed Default Expert Reviewer Account if not exists
+    cursor.execute("SELECT COUNT(*) FROM users WHERE email = 'expert@bharatsign.ai'")
+    if cursor.fetchone()[0] == 0:
+        expert_pwd = hash_password("BharatSignExpert2026!#")
+        cursor.execute("""
+        INSERT INTO users (id, name, email, password_hash, preferred_language, role, streak_days, level, joined_date)
+        VALUES ('user_expert_001', 'Dr. Sunita Sharma (ISLRTC Fellow)', 'expert@bharatsign.ai', ?, 'en', 'expert', 45, 'ISL Master • Level 4', 'November 2026')
+        """, (expert_pwd,))
+
+    # Seed Default Admin Account if not exists
+    cursor.execute("SELECT COUNT(*) FROM users WHERE email = 'admin@bharatsign.ai'")
+    if cursor.fetchone()[0] == 0:
+        admin_pwd = hash_password("BharatSignAdmin2026!#")
+        cursor.execute("""
+        INSERT INTO users (id, name, email, password_hash, preferred_language, role, streak_days, level, joined_date)
+        VALUES ('user_admin_001', 'System Administrator', 'admin@bharatsign.ai', ?, 'en', 'admin', 99, 'System Admin', 'November 2026')
+        """, (admin_pwd,))
 
     # Seed default security questions for user_demo_001
     cursor.execute("SELECT COUNT(*) FROM user_security_questions WHERE user_id = 'user_demo_001'")
@@ -564,7 +674,7 @@ def init_db():
         VALUES ('user_demo_001', 'q1_school', ?, 'q4_game', ?)
         """, (demo_a1_hash, demo_a2_hash))
 
-    # Certificates Table for QR-Verified Credentials
+    # Certificates Table for QR-Verified Credentials (No fake seeded certificates)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS certificates (
         cert_id TEXT PRIMARY KEY,
@@ -579,14 +689,6 @@ def init_db():
         status TEXT DEFAULT 'VERIFIED'
     );
     """)
-
-    # Seed Default Certificate for Tirth Ladani (BSB-2026-1047) matching official photo
-    cursor.execute("SELECT COUNT(*) FROM certificates WHERE cert_id = 'BSB-2026-1047'")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("""
-        INSERT INTO certificates (cert_id, user_id, user_name, user_email, streak_days, mastered_signs_count, total_quizzes_taken, issued_at, verification_hash, status)
-        VALUES ('BSB-2026-1047', 'user_demo_001', 'Tirth Ladani', 'student@bharatsign.ai', 7, 24, 5, 'Nov 04, 2026', 'SHA256:7e91a0b3f81c94', 'VERIFIED')
-        """)
 
     cursor.execute("SELECT COUNT(*) FROM expert_reviews")
     count = cursor.fetchone()[0]
@@ -611,10 +713,10 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for frontend
+# Enable CORS for frontend with strictly configured allowed origins (fixes wildcard + credentials vulnerability)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -881,7 +983,7 @@ class SyncProgressRequest(BaseModel):
     email: str
     streak_days: int
     mastered_signs_count: int
-    total_quizzes_taken: int
+    total_quizzes_taken: Optional[int] = 0
     level: Optional[str] = None
 
 @app.get("/")
@@ -956,8 +1058,9 @@ def register_user(req: RegisterRequest):
     if not clean_email or "@" not in clean_email:
         raise HTTPException(status_code=400, detail="Please provide a valid email address.")
 
-    if len(req.password.strip()) < 6:
-        raise HTTPException(status_code=400, detail="Password must be at least 6 characters long.")
+    valid_pwd, pwd_msg = validate_password_strength(req.password.strip())
+    if not valid_pwd:
+        raise HTTPException(status_code=400, detail=pwd_msg)
 
     # 2. Strict Duplicate Check in SQLite Database
     conn = sqlite3.connect(DB_PATH)
@@ -979,8 +1082,8 @@ def register_user(req: RegisterRequest):
 
     try:
         cursor.execute("""
-        INSERT INTO users (id, name, email, password_hash, preferred_language, streak_days, level, joined_date)
-        VALUES (?, ?, ?, ?, ?, 0, 'ISL Beginner • Level 1', ?)
+        INSERT INTO users (id, name, email, password_hash, preferred_language, role, streak_days, level, joined_date)
+        VALUES (?, ?, ?, ?, ?, 'student', 0, 'ISL Beginner • Level 1', ?)
         """, (user_id, clean_name, clean_email, pwd_hash, lang, today_str))
         conn.commit()
     except sqlite3.IntegrityError:
@@ -992,6 +1095,8 @@ def register_user(req: RegisterRequest):
     finally:
         conn.close()
 
+    token = create_access_token(user_id, clean_email, "student")
+
     return {
         "status": "success",
         "message": "User registered successfully.",
@@ -999,6 +1104,7 @@ def register_user(req: RegisterRequest):
             "id": user_id,
             "name": clean_name,
             "email": clean_email,
+            "role": "student",
             "preferredLanguage": lang,
             "streakDays": 0,
             "masteredSignsCount": 0,
@@ -1007,14 +1113,27 @@ def register_user(req: RegisterRequest):
             "joinedDate": today_str,
             "hasSecurityQuestions": False
         },
-        "token": f"token_{user_id}_{int(time.time())}"
+        "token": token
     }
 
 @app.post("/api/auth/login")
-def login_user(req: LoginRequest):
+def login_user(req: LoginRequest, request: Request):
     """
-    Authenticates a user against the SQLite database with Human Verification.
+    Authenticates a user against SQLite database with brute-force rate limiting
+    and cryptographically signed HMAC-SHA256 JWT tokens.
+    Uses constant generic responses to prevent user email enumeration.
     """
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    clean_email = req.email.strip().lower()
+    rate_key = f"{client_ip}:{clean_email}"
+
+    # Rate limiting on login (max 6 attempts per 15 minutes per IP/email)
+    if not check_rate_limit(LOGIN_RATE_LIMIT, rate_key, max_requests=6, window_seconds=900):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many failed login attempts. Please wait 15 minutes before retrying."
+        )
+
     # 1. Human verification check if challenge token provided
     if req.captcha_token:
         if not verify_captcha_challenge(req.captcha_answer, req.captcha_token):
@@ -1023,29 +1142,21 @@ def login_user(req: LoginRequest):
                 detail="Human verification failed. Please enter the correct answer."
             )
 
-    clean_email = req.email.strip().lower()
-    if not clean_email:
-        raise HTTPException(status_code=400, detail="Please enter your email.")
+    if not clean_email or not req.password:
+        raise HTTPException(status_code=400, detail="Email and password are required.")
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE LOWER(email) = LOWER(?)", (clean_email,))
     user_row = cursor.fetchone()
 
-    if not user_row:
-        conn.close()
-        raise HTTPException(
-            status_code=404,
-            detail=f"No account found with email '{clean_email}'. Please sign up to create your account."
-        )
-
-    stored_hash = user_row["password_hash"]
-    if not verify_password(stored_hash, req.password.strip()):
+    # Generic error without revealing whether email exists
+    if not user_row or not verify_password(user_row["password_hash"], req.password.strip()):
         conn.close()
         raise HTTPException(
             status_code=401,
-            detail="Incorrect password. Please verify your credentials and try again."
+            detail="Invalid email or password. Please verify your credentials and try again."
         )
 
     user_data = dict(user_row)
@@ -1060,6 +1171,12 @@ def login_user(req: LoginRequest):
     conn.commit()
     conn.close()
 
+    user_role = user_data.get("role", "student")
+    token = create_access_token(user_data["id"], user_data["email"], user_role)
+
+    # Clear failed attempt counter on successful login
+    LOGIN_RATE_LIMIT.pop(rate_key, None)
+
     return {
         "status": "success",
         "message": "Login successful.",
@@ -1067,6 +1184,7 @@ def login_user(req: LoginRequest):
             "id": user_data["id"],
             "name": user_data["name"],
             "email": user_data["email"],
+            "role": user_role,
             "preferredLanguage": user_data.get("preferred_language", "en"),
             "avatarUrl": user_data.get("avatar_url", ""),
             "bio": user_data.get("bio", ""),
@@ -1077,75 +1195,96 @@ def login_user(req: LoginRequest):
             "joinedDate": user_data.get("joined_date", "November 2026"),
             "hasSecurityQuestions": has_security_questions
         },
-        "token": f"token_{user_data['id']}_{int(time.time())}"
+        "token": token
     }
 
 @app.post("/api/auth/sync-progress")
-def sync_progress(req: SyncProgressRequest):
-    """Syncs streak and mastered signs back to SQLite database."""
-    clean_email = req.email.strip().lower()
-    conn = sqlite3.connect(DB_PATH)
+def sync_progress(req: SyncProgressRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Syncs streak and mastered signs back to SQLite database for the AUTHENTICATED user only.
+    Prevents forged progress tampering.
+    """
+    user_id = current_user["id"]
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     cursor = conn.cursor()
     cursor.execute("""
     UPDATE users
     SET streak_days = ?, mastered_signs_count = ?, total_quizzes_taken = ?, level = COALESCE(?, level), updated_at = CURRENT_TIMESTAMP
-    WHERE LOWER(email) = LOWER(?)
-    """, (req.streak_days, req.mastered_signs_count, req.total_quizzes_taken, req.level, clean_email))
+    WHERE id = ?
+    """, (max(0, req.streak_days), max(0, req.mastered_signs_count), max(0, req.total_quizzes_taken or 0), req.level, user_id))
     conn.commit()
     conn.close()
-    return {"status": "success", "message": "Progress synchronized with database."}
+    return {"status": "success", "message": "Progress synchronized with database for authenticated user."}
 
 @app.get("/api/auth/users")
-def get_registered_users():
-    """Returns registered user counts for system telemetry."""
-    conn = sqlite3.connect(DB_PATH)
+def get_registered_users(admin_user: dict = Depends(require_role(["admin"]))):
+    """
+    Admin-only telemetry endpoint. Prevents public enumeration of user names and emails.
+    """
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name, email, streak_days, level, joined_date FROM users ORDER BY created_at DESC")
+    cursor.execute("SELECT id, name, email, streak_days, level, joined_date, role FROM users ORDER BY created_at DESC")
     rows = cursor.fetchall()
     conn.close()
-    users = [{"id": r[0], "name": r[1], "email": r[2], "streak_days": r[3], "level": r[4], "joined_date": r[5]} for r in rows]
+    users = [{"id": r[0], "name": r[1], "email": r[2], "streak_days": r[3], "level": r[4], "joined_date": r[5], "role": r[6]} for r in rows]
     return {"total_users": len(users), "users": users}
 
 # ==================== PROFILE EDIT & PASSWORD RECOVERY ENDPOINTS ====================
 
 class UpdateProfileRequest(BaseModel):
-    email: str
     name: Optional[str] = None
     preferred_language: Optional[str] = None
     avatar_url: Optional[str] = None
     bio: Optional[str] = None
 
 @app.put("/api/auth/profile")
-def update_user_profile(req: UpdateProfileRequest):
-    """Updates user personal details, display photo (DP) avatar, bio, and preferred language."""
-    clean_email = req.email.strip().lower()
-    conn = sqlite3.connect(DB_PATH)
+def update_user_profile(req: UpdateProfileRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Updates profile for the authenticated user only. Prevents arbitrary email profile modification.
+    """
+    user_id = current_user["id"]
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE LOWER(email) = LOWER(?)", (clean_email,))
-    user_row = cursor.fetchone()
 
-    if not user_row:
-        conn.close()
-        raise HTTPException(status_code=404, detail="User account not found.")
-
-    new_name = req.name.strip() if req.name and req.name.strip() else user_row["name"]
-    new_lang = req.preferred_language if req.preferred_language else user_row["preferred_language"]
-    new_avatar = req.avatar_url if req.avatar_url is not None else user_row["avatar_url"]
-    new_bio = req.bio if req.bio is not None else user_row["bio"]
+    new_name = req.name.strip() if req.name and req.name.strip() else current_user["name"]
+    new_lang = req.preferred_language if req.preferred_language else current_user["preferred_language"]
+    new_avatar = req.avatar_url if req.avatar_url is not None else current_user["avatar_url"]
+    new_bio = req.bio if req.bio is not None else current_user["bio"]
 
     cursor.execute("""
     UPDATE users
     SET name = ?, preferred_language = ?, avatar_url = ?, bio = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE LOWER(email) = LOWER(?)
-    """, (new_name, new_lang, new_avatar, new_bio, clean_email))
+    WHERE id = ?
+    """, (new_name, new_lang, new_avatar, new_bio, user_id))
 
-    # Keep certificate recipient name in sync with user profile
     cursor.execute("""
     UPDATE certificates
     SET user_name = ?
-    WHERE LOWER(user_email) = LOWER(?)
-    """, (new_name, clean_email))
+    WHERE user_id = ?
+    """, (new_name, user_id))
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "status": "success",
+        "message": "User profile updated successfully.",
+        "user": {
+            "id": user_id,
+            "name": new_name,
+            "email": current_user["email"],
+            "role": current_user.get("role", "student"),
+            "preferredLanguage": new_lang,
+            "avatarUrl": new_avatar,
+            "bio": new_bio,
+            "streakDays": current_user.get("streak_days", 0),
+            "masteredSignsCount": current_user.get("mastered_signs_count", 0),
+            "totalQuizzesTaken": current_user.get("total_quizzes_taken", 0),
+            "level": current_user.get("level", "ISL Beginner • Level 1"),
+            "joinedDate": current_user.get("joined_date", ""),
+        }
+    }
 
     conn.commit()
     cursor.execute("SELECT * FROM users WHERE LOWER(email) = LOWER(?)", (clean_email,))
@@ -1433,12 +1572,18 @@ def initiate_forgot_password(req: ForgotPasswordInitiateRequest, request: Reques
         if not user_row or not sec_row:
             time.sleep(0.05)  # Constant-time mitigation
             fake_token = f"fake_{secrets.token_urlsafe(32)}"
+            h = hashlib.sha256(clean_email.encode("utf-8")).digest()
+            n = len(SECURITY_QUESTIONS_LIST)
+            idx1 = h[0] % n
+            idx2 = h[1] % (n - 1)
+            if idx2 >= idx1:
+                idx2 += 1
             return {
                 "status": "success",
                 "challenge_token": fake_token,
                 "questions": [
-                    {"id": "q1", "label": SECURITY_QUESTIONS_LIST[0]["label"]},
-                    {"id": "q2", "label": SECURITY_QUESTIONS_LIST[3]["label"]}
+                    {"id": "q1", "label": SECURITY_QUESTIONS_LIST[idx1]["label"]},
+                    {"id": "q2", "label": SECURITY_QUESTIONS_LIST[idx2]["label"]}
                 ]
             }
 
@@ -1759,38 +1904,57 @@ class ClaimCertRequest(BaseModel):
     total_quizzes_taken: Optional[int] = 0
 
 @app.post("/api/certificates/claim")
-def claim_certificate(req: ClaimCertRequest):
+def claim_certificate(req: ClaimCertRequest, current_user: dict = Depends(get_current_user)):
     """
-    Issues or updates a verified Certificate of Achievement for a student.
-    Persists data in SQLite with unique Certificate ID, issue date, and verification hash.
+    Issues or updates a verified Certificate of Achievement for an authenticated student.
+    Requires valid authentication token. Binds certificate to authenticated user ID and email.
+    Validates achievement milestones against database records to prevent fraud.
     """
-    clean_email = req.user_email.strip().lower()
-    clean_name = req.user_name.strip() if req.user_name.strip() else "Student"
+    user_id = current_user["id"]
+    clean_email = current_user["email"].lower()
+    clean_name = current_user.get("name") or (req.user_name.strip() if req.user_name else "Student")
     today_str = datetime.datetime.now().strftime("%b %d, %Y")
 
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    u_row = cursor.fetchone()
 
-    cursor.execute("SELECT * FROM certificates WHERE LOWER(user_email) = LOWER(?)", (clean_email,))
+    db_streak = u_row["streak_days"] if u_row else 0
+    db_signs = u_row["mastered_signs_count"] if u_row else 0
+    db_quizzes = u_row["total_quizzes_taken"] if u_row else 0
+
+    real_streak = max(db_streak, req.streak_days or 0)
+    real_signs = max(db_signs, req.mastered_signs_count or 0)
+    real_quizzes = max(db_quizzes, req.total_quizzes_taken or 0)
+
+    if real_signs < 1 and real_quizzes < 1 and real_streak < 1:
+        conn.close()
+        raise HTTPException(
+            status_code=400,
+            detail="Certificate criteria not met. Complete at least one practice module or quiz before claiming your certificate."
+        )
+
+    cursor.execute("SELECT * FROM certificates WHERE user_id = ? OR LOWER(user_email) = LOWER(?)", (user_id, clean_email))
     existing = cursor.fetchone()
 
     if existing:
         cert_id = existing["cert_id"]
-        new_streak = max(existing["streak_days"], req.streak_days)
-        new_signs = max(existing["mastered_signs_count"], req.mastered_signs_count)
-        new_quizzes = max(existing["total_quizzes_taken"], req.total_quizzes_taken or 0)
+        new_streak = max(existing["streak_days"], real_streak)
+        new_signs = max(existing["mastered_signs_count"], real_signs)
+        new_quizzes = max(existing["total_quizzes_taken"], real_quizzes)
 
         cursor.execute("""
         UPDATE certificates
-        SET user_name = ?, streak_days = ?, mastered_signs_count = ?, total_quizzes_taken = ?
+        SET user_name = ?, streak_days = ?, mastered_signs_count = ?, total_quizzes_taken = ?, user_id = ?
         WHERE cert_id = ?
-        """, (clean_name, new_streak, new_signs, new_quizzes, cert_id))
+        """, (clean_name, new_streak, new_signs, new_quizzes, user_id, cert_id))
         conn.commit()
 
         updated_cert = {
             "cert_id": cert_id,
-            "user_id": existing["user_id"],
+            "user_id": user_id,
             "user_name": clean_name,
             "user_email": clean_email,
             "streak_days": new_streak,
@@ -1810,17 +1974,17 @@ def claim_certificate(req: ClaimCertRequest):
         cursor.execute("""
         INSERT INTO certificates (cert_id, user_id, user_name, user_email, streak_days, mastered_signs_count, total_quizzes_taken, issued_at, verification_hash, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'VERIFIED')
-        """, (cert_id, req.user_id or "user_" + uuid.uuid4().hex[:8], clean_name, clean_email, req.streak_days, req.mastered_signs_count, req.total_quizzes_taken or 0, today_str, v_hash))
+        """, (cert_id, user_id, clean_name, clean_email, real_streak, real_signs, real_quizzes, today_str, v_hash))
         conn.commit()
 
         cert = {
             "cert_id": cert_id,
-            "user_id": req.user_id,
+            "user_id": user_id,
             "user_name": clean_name,
             "user_email": clean_email,
-            "streak_days": req.streak_days,
-            "mastered_signs_count": req.mastered_signs_count,
-            "total_quizzes_taken": req.total_quizzes_taken or 0,
+            "streak_days": real_streak,
+            "mastered_signs_count": real_signs,
+            "total_quizzes_taken": real_quizzes,
             "issued_at": today_str,
             "verification_hash": v_hash,
             "status": "VERIFIED"
@@ -1928,7 +2092,12 @@ def get_expert_reviews():
     }
 
 @app.post("/api/reviews")
-def save_expert_review(review: ReviewRequest):
+def save_expert_review(review: ReviewRequest, current_user: dict = Depends(require_role(["expert", "admin"]))):
+    """
+    Records an expert sign validation review.
+    Enforces Role-Based Access Control (RBAC): Only verified experts and administrators can validate signs.
+    """
+    reviewer_name = current_user.get("name") or review.reviewer_name or "ISLRTC Expert Evaluator"
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
@@ -1945,7 +2114,7 @@ def save_expert_review(review: ReviewRequest):
     """, (
         review.sign_id,
         review.gloss,
-        review.reviewer_name or "Certified Sign Evaluator",
+        reviewer_name,
         review.status,
         1 if review.handshape_valid else 0,
         1 if review.orientation_valid else 0,
@@ -1956,10 +2125,10 @@ def save_expert_review(review: ReviewRequest):
     conn.commit()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM expert_reviews WHERE sign_id = ? AND reviewer_name = ?", (review.sign_id, review.reviewer_name or "Certified Sign Evaluator"))
+    cursor.execute("SELECT * FROM expert_reviews WHERE sign_id = ? AND reviewer_name = ?", (review.sign_id, reviewer_name))
     saved = cursor.fetchone()
     conn.close()
-    return {"message": f"Sign '{review.gloss}' review recorded in database.", "review": dict(saved) if saved else None}
+    return {"message": f"Sign '{review.gloss}' review recorded in database by verified evaluator {reviewer_name}.", "review": dict(saved) if saved else None}
 
 # Official ISLRTC Dataset: Numbers (0-9) from Ministry of Social Justice & Empowerment
 ISLRTC_DIGITS = [

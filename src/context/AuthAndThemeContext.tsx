@@ -5,6 +5,8 @@ export interface UserProfile {
   name: string
   email: string
   preferredLanguage: string
+  role?: string
+  token?: string
   streakDays: number
   lastActiveDate?: string
   lastQuizDate?: string
@@ -26,7 +28,7 @@ export interface UserProfile {
 interface AuthAndThemeContextType {
   user: UserProfile | null
   isAuthenticated: boolean
-  login: (name: string, email: string, language?: string, existingUser?: Partial<UserProfile>) => void
+  login: (name: string, email: string, language?: string, existingUser?: Partial<UserProfile>, token?: string) => void
   logout: () => void
   updateProfile: (updates: Partial<UserProfile>) => void
   recordDailyActivity: () => boolean
@@ -106,9 +108,14 @@ export function AuthAndThemeProvider({ children }: { children: React.ReactNode }
 
   const syncWithBackend = (u: UserProfile) => {
     try {
+      const token = localStorage.getItem("bharatsign_token")
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`
+      }
       fetch("http://127.0.0.1:8000/api/auth/sync-progress", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           email: u.email,
           streak_days: u.streakDays,
@@ -127,14 +134,21 @@ export function AuthAndThemeProvider({ children }: { children: React.ReactNode }
     name: string,
     email: string,
     language: string = "en",
-    existingUser?: Partial<UserProfile>
+    existingUser?: Partial<UserProfile>,
+    token?: string
   ) => {
     const today = new Date().toDateString()
+    const effectiveToken = token || (existingUser as any)?.token
+    if (effectiveToken) {
+      localStorage.setItem("bharatsign_token", effectiveToken)
+    }
     const newUser: UserProfile = {
       id: existingUser?.id || `user_${Date.now()}`,
       name: existingUser?.name || name || "New ISL Student",
       email: existingUser?.email || email || "student@bharatsign.ai",
       preferredLanguage: existingUser?.preferredLanguage || language,
+      role: existingUser?.role || "student",
+      token: effectiveToken,
       streakDays: existingUser?.streakDays !== undefined ? existingUser.streakDays : 0,
       lastActiveDate: existingUser?.lastActiveDate || today,
       lastQuizDate: existingUser?.lastQuizDate || "",
@@ -171,6 +185,7 @@ export function AuthAndThemeProvider({ children }: { children: React.ReactNode }
   const logout = () => {
     setUser(null)
     localStorage.removeItem("bharatsign_user")
+    localStorage.removeItem("bharatsign_token")
   }
 
   // Active Everyday / Visit Website Action: Increases streak (+1) when active!
