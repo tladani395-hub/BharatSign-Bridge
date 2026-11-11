@@ -111,20 +111,38 @@ export default function Auth() {
       .catch(() => {})
   }, [])
 
-  const handleInitiateOAuth = (provider: "google" | "github") => {
+  const handleInitiateOAuth = async (provider: "google" | "github") => {
     setAuthError(null)
 
+    let latestConfig = oauthConfig
+    let googleId = latestConfig?.google?.client_id || (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || ""
+    let githubId = latestConfig?.github?.client_id || (import.meta.env.VITE_GITHUB_CLIENT_ID as string) || ""
+
+    // On-demand retry if config wasn't loaded at mount time
+    if ((provider === "google" && !googleId) || (provider === "github" && !githubId)) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/oauth/config`)
+        if (res.ok) {
+          const fresh = await res.json()
+          setOauthConfig(fresh)
+          googleId = fresh?.google?.client_id || googleId
+          githubId = fresh?.github?.client_id || githubId
+        }
+      } catch {
+        // Ignore network error here; handled below if ID is still empty
+      }
+    }
+
     if (provider === "google") {
-      const clientId = oauthConfig?.google?.client_id || ""
-      if (!clientId) {
+      if (!googleId) {
         triggerError(
-          "To open Google's sign-in page, please set GOOGLE_CLIENT_ID in your .env file."
+          "Google Client ID could not be loaded. Make sure the backend server is running and GOOGLE_CLIENT_ID is set in .env."
         )
         return
       }
       const redirectUri = `${window.location.origin}/auth/callback`
       const params = new URLSearchParams({
-        client_id: clientId,
+        client_id: googleId,
         redirect_uri: redirectUri,
         response_type: "code",
         scope: "openid email profile",
@@ -136,16 +154,15 @@ export default function Auth() {
     }
 
     if (provider === "github") {
-      const clientId = oauthConfig?.github?.client_id || ""
-      if (!clientId) {
+      if (!githubId) {
         triggerError(
-          "To open GitHub's sign-in page, please set GITHUB_CLIENT_ID in your .env file."
+          "GitHub Client ID could not be loaded. Make sure the backend server is running and GITHUB_CLIENT_ID is set in .env."
         )
         return
       }
       const redirectUri = `${window.location.origin}/auth/callback`
       const params = new URLSearchParams({
-        client_id: clientId,
+        client_id: githubId,
         redirect_uri: redirectUri,
         scope: "read:user user:email",
         state: "github",
