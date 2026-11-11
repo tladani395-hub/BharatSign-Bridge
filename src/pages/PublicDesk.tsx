@@ -20,6 +20,7 @@ import type { SignGesture } from "@/components/avatar/ThreeAvatar"
 import Breadcrumbs from "@/components/layout/Breadcrumbs"
 import { Button } from "@/components/ui/button"
 import { INDIC_LANGUAGES, speakText, createSpeechRecognizer } from "@/lib/speech"
+import { copyToClipboard } from "@/lib/clipboard"
 
 interface PublicServiceCategory {
   id: string
@@ -482,7 +483,7 @@ Request: ${activeScenario.label}
 Spoken Translation: "${spokenPhrase}"
 Time: ${new Date().toLocaleTimeString()}
 Date: ${new Date().toLocaleDateString()}`
-    navigator.clipboard.writeText(text)
+    void copyToClipboard(text)
     setCopiedToken(true)
     setTimeout(() => setCopiedToken(false), 2000)
   }

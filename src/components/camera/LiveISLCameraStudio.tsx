@@ -21,6 +21,7 @@ import {
   Cpu,
   Check,
   BookOpen,
+  SwitchCamera,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { INDIC_LANGUAGES, speakText } from "@/lib/speech"
@@ -595,6 +596,8 @@ export default function LiveISLCameraStudio({
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [availableDevices, setAvailableDevices] = useState<MediaDeviceInfo[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("")
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user")
+  const [isPortraitFeed, setIsPortraitFeed] = useState(false)
   const [engineStatus, setEngineStatus] = useState<"loading" | "active" | "error">("loading")
 
   // Tracking Customization & Visual Overlay Toggles
@@ -689,16 +692,13 @@ export default function LiveISLCameraStudio({
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
         const devices = await navigator.mediaDevices.enumerateDevices()
-        const videoDevs = devices.filter((d) => d.kind === "videoinput")
+        const videoDevs = devices.filter((d) => d.kind === "videoinput" && d.deviceId)
         setAvailableDevices(videoDevs)
-        if (videoDevs.length > 0 && !selectedDeviceId) {
-          setSelectedDeviceId(videoDevs[0].deviceId)
-        }
       }
     } catch (err) {
       console.warn("Could not enumerate camera devices:", err)
     }
-  }, [selectedDeviceId])
+  }, [])
 
   // Trigger Voice Output
   const triggerVoiceOutput = useCallback(
@@ -1335,23 +1335,71 @@ export default function LiveISLCameraStudio({
     }
   }, [handleMediaPipeHandsResults, handleMediaPipePoseResults])
 
-  // Start Camera
-  const startCamera = async () => {
+  // Start Camera with mobile-safe constraint cascade
+  const startCamera = async (
+    overrideDeviceId?: string,
+    overrideFacingMode?: "user" | "environment"
+  ) => {
     setCameraError(null)
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Webcam access is not supported by your browser.")
+        if (typeof window !== "undefined" && !window.isSecureContext) {
+          throw new Error(
+            "Mobile browsers block camera access on plain HTTP network URLs. Open via https:// (e.g. ngrok/tunnel) or http://localhost:5173 to use the live camera."
+          )
+        }
+        throw new Error("Camera access is not supported by your browser.")
       }
 
-      const constraints: MediaStreamConstraints = {
-        video: selectedDeviceId
-          ? { deviceId: { exact: selectedDeviceId }, width: { ideal: 640 }, height: { ideal: 480 } }
-          : { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+      // Release existing camera stream first (required on Android/iOS hardware before switching)
+      if (videoRef.current && videoRef.current.srcObject) {
+        const prevStream = videoRef.current.srcObject as MediaStream
+        prevStream.getTracks().forEach((track) => track.stop())
+        videoRef.current.srcObject = null
+      }
+
+      const targetDeviceId = overrideDeviceId !== undefined ? overrideDeviceId : selectedDeviceId
+      const targetFacing = overrideFacingMode || facingMode
+
+      const attempts: MediaStreamConstraints[] = []
+      if (targetDeviceId) {
+        attempts.push({
+          video: { deviceId: { exact: targetDeviceId }, width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false,
+        })
+      }
+      attempts.push({
+        video: { facingMode: { ideal: targetFacing }, width: { ideal: 640 }, height: { ideal: 480 } },
         audio: false,
+      })
+      attempts.push({
+        video: { facingMode: targetFacing },
+        audio: false,
+      })
+      attempts.push({ video: true, audio: false })
+
+      let stream: MediaStream | null = null
+      let lastErr: unknown = null
+      for (const constraints of attempts) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints)
+          break
+        } catch (err: any) {
+          lastErr = err
+          // Permission denied or hardware blocked should stop immediately rather than retrying
+          if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
+            throw err
+          }
+        }
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints)
+      if (!stream) {
+        throw lastErr || new Error("Unable to access camera stream.")
+      }
+
       if (videoRef.current) {
+        videoRef.current.setAttribute("playsinline", "true")
+        videoRef.current.muted = true
         videoRef.current.srcObject = stream
         try {
           await videoRef.current.play()
@@ -1362,6 +1410,13 @@ export default function LiveISLCameraStudio({
             }
           }
         }
+
+        const activeTrack = stream.getVideoTracks()[0]
+        const activeSettings = activeTrack?.getSettings?.()
+        if (activeSettings?.deviceId && !targetDeviceId) {
+          setSelectedDeviceId(activeSettings.deviceId)
+        }
+
         setIsCameraActive(true)
         setHasPermission(true)
         refreshDevices()
@@ -1440,25 +1495,42 @@ export default function LiveISLCameraStudio({
     setSelectedDeviceId(deviceId)
     stopCamera()
     setTimeout(() => {
-      startCamera()
-    }, 200)
+      startCamera(deviceId)
+    }, 150)
   }
 
-  // Toggle Fullscreen
+  // Flip Front / Back Camera on Mobile
+  const toggleFacingMode = () => {
+    const nextFacing = facingMode === "user" ? "environment" : "user"
+    setFacingMode(nextFacing)
+    setSelectedDeviceId("")
+    stopCamera()
+    setTimeout(() => {
+      startCamera("", nextFacing)
+    }, 150)
+  }
+
+  // Toggle Fullscreen (cross-browser safe for iOS/Android)
   const toggleFullscreen = () => {
-    if (!containerRef.current) return
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().catch((err) => console.error(err))
-      setIsFullscreen(true)
+    const el = containerRef.current as any
+    if (!el) return
+    if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+      const req = el.requestFullscreen || el.webkitRequestFullscreen
+      if (req) {
+        Promise.resolve(req.call(el)).catch((err: unknown) => console.error(err))
+        setIsFullscreen(true)
+      }
     } else {
-      document.exitFullscreen().catch((err) => console.error(err))
+      const exit = document.exitFullscreen || (document as any).webkitExitFullscreen
+      if (exit) {
+        Promise.resolve(exit.call(document)).catch((err: unknown) => console.error(err))
+      }
       setIsFullscreen(false)
     }
   }
 
   // Initial mount
   useEffect(() => {
-    refreshDevices()
     startCamera()
     return () => {
       stopCamera()
@@ -1507,8 +1579,11 @@ export default function LiveISLCameraStudio({
 
       const width = video.videoWidth || 640
       const height = video.videoHeight || 480
-      canvas.width = width
-      canvas.height = height
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width
+        canvas.height = height
+        setIsPortraitFeed(height > width)
+      }
 
       // 1. Render mirrored live webcam frame
       ctx.save()
@@ -1953,22 +2028,17 @@ export default function LiveISLCameraStudio({
           </div>
 
           {/* Camera Viewport Canvas */}
-          <div className="relative aspect-[4/3] w-full rounded-3xl overflow-hidden bg-slate-950 border border-border shadow-2xl">
+          <div
+            className={`relative ${
+              isPortraitFeed ? "aspect-[3/4] max-h-[75vh] mx-auto" : "aspect-[4/3]"
+            } w-full rounded-3xl overflow-hidden bg-slate-950 border border-border shadow-2xl`}
+          >
             <video
               ref={videoRef}
               playsInline
               muted
               autoPlay
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "640px",
-                height: "480px",
-                opacity: 0,
-                pointerEvents: "none",
-                zIndex: -1,
-              }}
+              className="absolute inset-0 w-full h-full opacity-0 pointer-events-none -z-10"
             />
             <canvas ref={canvasRef} className="w-full h-full object-cover" />
 
@@ -1993,7 +2063,7 @@ export default function LiveISLCameraStudio({
 
                 <div className="flex items-center gap-3">
                   <Button
-                    onClick={startCamera}
+                    onClick={() => startCamera()}
                     className="gap-2 text-xs font-bold bg-primary hover:bg-primary/90 text-white shadow-lg h-10 px-5"
                   >
                     <CheckCircle2 className="h-4 w-4" />
@@ -2017,7 +2087,7 @@ export default function LiveISLCameraStudio({
                 </div>
 
                 <Button
-                  onClick={startCamera}
+                  onClick={() => startCamera()}
                   className="gap-2 text-xs font-bold bg-primary hover:bg-primary/90 text-white shadow-xl h-11 px-6 rounded-xl transition-all transform hover:scale-105"
                 >
                   <Camera className="h-4 w-4" />
@@ -2083,10 +2153,22 @@ export default function LiveISLCameraStudio({
                   size="sm"
                   variant="secondary"
                   className="h-8 text-xs bg-slate-900/90 hover:bg-slate-800 text-white border border-slate-700 backdrop-blur-md shadow-md"
-                  onClick={isCameraActive ? stopCamera : startCamera}
+                  onClick={() => (isCameraActive ? stopCamera() : startCamera())}
                 >
                   {isCameraActive ? <CameraOff className="h-3.5 w-3.5 mr-1 text-rose-400" /> : <Camera className="h-3.5 w-3.5 mr-1 text-emerald-400" />}
                   {isCameraActive ? "Stop Camera" : "Start Camera"}
+                </Button>
+
+                {/* Flip Front / Rear Camera (Mobile-friendly) */}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="h-8 text-xs bg-slate-900/90 hover:bg-slate-800 text-white border border-slate-700 backdrop-blur-md shadow-md"
+                  onClick={toggleFacingMode}
+                  title="Switch between Front and Rear camera"
+                >
+                  <SwitchCamera className="h-3.5 w-3.5 mr-1 text-cyan-400" />
+                  {facingMode === "user" ? "Rear Cam" : "Front Cam"}
                 </Button>
 
                 {/* Pause / Resume Tracking */}

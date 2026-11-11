@@ -521,18 +521,52 @@ export default function CameraTranslator({
     triggerVoice(gesture)
   }
 
-  // Start Real User Webcam
+  // Start Real User Webcam (Mobile-safe with constraint fallbacks)
   const startCamera = async () => {
     setCameraError(null)
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Webcam access is not supported by your browser.")
+        if (typeof window !== "undefined" && !window.isSecureContext) {
+          throw new Error(
+            "Mobile browsers block camera access on plain HTTP network URLs. Open via https:// or http://localhost:5173 to use the live camera."
+          )
+        }
+        throw new Error("Camera access is not supported by your browser.")
       }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
-        audio: false,
-      })
+
+      if (videoRef.current && videoRef.current.srcObject) {
+        const prev = videoRef.current.srcObject as MediaStream
+        prev.getTracks().forEach((t) => t.stop())
+        videoRef.current.srcObject = null
+      }
+
+      const attempts: MediaStreamConstraints[] = [
+        { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: { ideal: "user" } }, audio: false },
+        { video: { facingMode: "user" }, audio: false },
+        { video: true, audio: false },
+      ]
+
+      let stream: MediaStream | null = null
+      let lastErr: unknown = null
+      for (const constraints of attempts) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints)
+          break
+        } catch (err: any) {
+          lastErr = err
+          if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
+            throw err
+          }
+        }
+      }
+
+      if (!stream) {
+        throw lastErr || new Error("Unable to access camera.")
+      }
+
       if (videoRef.current) {
+        videoRef.current.setAttribute("playsinline", "true")
+        videoRef.current.muted = true
         videoRef.current.srcObject = stream
         try {
           await videoRef.current.play()
@@ -621,8 +655,10 @@ export default function CameraTranslator({
 
       const w = video.videoWidth || 640
       const h = video.videoHeight || 480
-      canvas.width = w
-      canvas.height = h
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w
+        canvas.height = h
+      }
 
       ctx.save()
       // Draw mirrored live webcam frame
@@ -770,7 +806,13 @@ export default function CameraTranslator({
         {/* Left Column: Full-Featured ML Webcam Viewport */}
         <div className="lg:col-span-7 flex flex-col gap-4">
           <div className="relative aspect-[4/3] w-full rounded-3xl overflow-hidden bg-slate-950 border border-border shadow-2xl">
-            <video ref={videoRef} className="hidden" playsInline muted autoPlay />
+            <video
+              ref={videoRef}
+              className="absolute inset-0 w-full h-full opacity-0 pointer-events-none -z-10"
+              playsInline
+              muted
+              autoPlay
+            />
             <canvas ref={canvasRef} className="w-full h-full object-cover" />
 
             {cameraError && (

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import ThreeAvatar from "@/components/avatar/ThreeAvatar"
 import type { SignGesture } from "@/components/avatar/ThreeAvatar"
 import { INDIC_LANGUAGES, speakText } from "@/lib/speech"
+import { copyToClipboard } from "@/lib/clipboard"
 
 interface SignToken {
   id: string
@@ -219,7 +220,7 @@ export default function SignCreatorStudio({ currentLanguage = "gu" }: SignCreato
 
   const handleCopyText = () => {
     const glossSummary = tokens.map((t) => t.gloss).join(" ")
-    navigator.clipboard.writeText(glossSummary)
+    void copyToClipboard(glossSummary)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }

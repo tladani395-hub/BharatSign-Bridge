@@ -16,6 +16,7 @@ import QRCode from "qrcode"
 import Logo from "@/components/brand/Logo"
 import { downloadCertificatePNG } from "@/lib/certificateGenerator"
 import { API_BASE_URL } from "@/config/api"
+import { copyToClipboard } from "@/lib/clipboard"
 
 interface CertificateData {
   cert_id: string
@@ -91,7 +92,7 @@ export default function VerifyCertificate() {
   }, [activeCertId])
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href)
+    void copyToClipboard(window.location.href)
     setCopiedLink(true)
     setTimeout(() => setCopiedLink(false), 2000)
   }

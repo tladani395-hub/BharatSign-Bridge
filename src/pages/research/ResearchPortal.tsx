@@ -12,6 +12,7 @@ import Breadcrumbs from "@/components/layout/Breadcrumbs"
 import { Button } from "@/components/ui/button"
 import { VOCABULARY_SIGNS } from "@/data/vocabularyData"
 import { ALPHABETS_DATA, NUMBERS_DATA } from "@/data/islData"
+import { copyToClipboard } from "@/lib/clipboard"
 
 export default function ResearchPortal() {
   const [activeTab, setActiveTab] = useState<"paper" | "dataset" | "benchmarks">("paper")
@@ -26,7 +27,7 @@ export default function ResearchPortal() {
 }`
 
   const handleCopyBibtex = () => {
-    navigator.clipboard.writeText(bibtexCitation)
+    void copyToClipboard(bibtexCitation)
     setCopiedBibtex(true)
     setTimeout(() => setCopiedBibtex(false), 2000)
   }

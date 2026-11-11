@@ -2327,6 +2327,39 @@ def claim_certificate(req: ClaimCertRequest, current_user: dict = Depends(get_cu
         conn.close()
         return {"status": "success", "certificate": cert}
 
+@app.get("/api/certificates/requirements")
+def get_certificate_requirements():
+    """
+    Returns learning milestones required to earn the official BharatSign-Bridge Certificate:
+    - Master at least 5 signs (alphabets, numbers, or vocabulary)
+    - Complete at least 1 day streak
+    - Take at least 1 interactive comprehension quiz
+    """
+    return {
+        "required_mastered_signs": 5,
+        "required_streak_days": 1,
+        "required_quizzes": 1,
+        "standard": "National ISLRTC NEP-2020 Standard",
+        "title": "Certificate of Achievement in Indian Sign Language",
+        "description": "Master 5 ISL signs and sustain a 1-day streak to claim your cryptographically verifiable certificate with public QR validation."
+    }
+
+@app.get("/api/certificates/user/{email}")
+def get_user_certificate(email: str, current_user: dict = Depends(get_current_user)):
+    """Fetches user certificate for the authenticated account owner only."""
+    if current_user["email"].lower() != email.strip().lower():
+        raise HTTPException(status_code=403, detail="Forbidden. You may only access your own certificate.")
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM certificates WHERE LOWER(user_email) = LOWER(?)", (email.strip(),))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return {"has_certificate": False, "certificate": None}
+    return {"has_certificate": True, "certificate": dict(row)}
+
 @app.get("/api/certificates/{cert_id}")
 def verify_certificate(cert_id: str):
     """
@@ -2362,39 +2395,6 @@ def verify_certificate(cert_id: str):
         "status": "verified",
         "verified": True,
         "certificate": public_cert
-    }
-
-@app.get("/api/certificates/user/{email}")
-def get_user_certificate(email: str, current_user: dict = Depends(get_current_user)):
-    """Fetches user certificate for the authenticated account owner only."""
-    if current_user["email"].lower() != email.strip().lower():
-        raise HTTPException(status_code=403, detail="Forbidden. You may only access your own certificate.")
-
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM certificates WHERE LOWER(user_email) = LOWER(?)", (email.strip(),))
-    row = cursor.fetchone()
-    conn.close()
-    if not row:
-        return {"has_certificate": False, "certificate": None}
-    return {"has_certificate": True, "certificate": dict(row)}
-
-@app.get("/api/certificates/requirements")
-def get_certificate_requirements():
-    """
-    Returns learning milestones required to earn the official BharatSign-Bridge Certificate:
-    - Master at least 5 signs (alphabets, numbers, or vocabulary)
-    - Complete at least 1 day streak
-    - Take at least 1 interactive comprehension quiz
-    """
-    return {
-        "required_mastered_signs": 5,
-        "required_streak_days": 1,
-        "required_quizzes": 1,
-        "standard": "National ISLRTC NEP-2020 Standard",
-        "title": "Certificate of Achievement in Indian Sign Language",
-        "description": "Master 5 ISL signs and sustain a 1-day streak to claim your cryptographically verifiable certificate with public QR validation."
     }
 
 @app.get("/api/languages")

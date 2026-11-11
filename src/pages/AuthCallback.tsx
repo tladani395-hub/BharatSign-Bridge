@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useNavigate, useSearchParams, Link } from "react-router-dom"
 import { RefreshCw, AlertCircle, ArrowLeft, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Logo from "@/components/brand/Logo"
 import { useAuthAndTheme } from "@/context/AuthAndThemeContext"
-import { API_BASE_URL } from "@/config/api"
+import { API_BASE_URL, getOAuthRedirectUri } from "@/config/api"
 
 export default function AuthCallback() {
   const [searchParams] = useSearchParams()
@@ -12,8 +12,11 @@ export default function AuthCallback() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const { login } = useAuthAndTheme()
   const navigate = useNavigate()
+  const hasExchangedRef = useRef(false)
 
   useEffect(() => {
+    if (hasExchangedRef.current) return
+
     const code = searchParams.get("code")
     const state = searchParams.get("state") || ""
     const error = searchParams.get("error")
@@ -31,9 +34,11 @@ export default function AuthCallback() {
       return
     }
 
+    hasExchangedRef.current = true
+
     const exchangeCode = async () => {
       try {
-        const isGoogle = state.toLowerCase().includes("google") || searchParams.has("scope") && searchParams.get("scope")?.includes("google")
+        const isGoogle = state.toLowerCase().includes("google") || (searchParams.has("scope") && searchParams.get("scope")?.includes("google"))
         const providerEndpoint = isGoogle
           ? `${API_BASE_URL}/api/auth/oauth/google`
           : `${API_BASE_URL}/api/auth/oauth/github`
@@ -43,7 +48,7 @@ export default function AuthCallback() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             code,
-            redirect_uri: `${window.location.origin}/auth/callback`,
+            redirect_uri: getOAuthRedirectUri(),
           }),
         })
 

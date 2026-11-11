@@ -14,6 +14,7 @@ import type { SignGesture } from "@/components/avatar/ThreeAvatar"
 import Breadcrumbs from "@/components/layout/Breadcrumbs"
 import { Button } from "@/components/ui/button"
 import { speakText, INDIC_LANGUAGES } from "@/lib/speech"
+import { copyToClipboard } from "@/lib/clipboard"
 
 interface SignToken {
   id: string
@@ -359,7 +360,7 @@ export default function Translate({ currentLanguage, onLanguageChange }: Transla
 
   const handleCopyGloss = () => {
     const glossStr = tokens.map((t) => t.gloss).join(" ")
-    navigator.clipboard.writeText(glossStr)
+    void copyToClipboard(glossStr)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }

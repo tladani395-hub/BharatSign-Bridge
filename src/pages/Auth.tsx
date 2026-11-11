@@ -22,7 +22,7 @@ import { useAuthAndTheme } from "@/context/AuthAndThemeContext"
 import { INDIC_LANGUAGES } from "@/lib/speech"
 import Logo from "@/components/brand/Logo"
 import WelcomeOverlay from "@/components/auth/WelcomeOverlay"
-import { API_BASE_URL } from "@/config/api"
+import { API_BASE_URL, getOAuthRedirectUri } from "@/config/api"
 
 const GoogleIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
@@ -133,6 +133,8 @@ export default function Auth() {
       }
     }
 
+    const redirectUri = getOAuthRedirectUri()
+
     if (provider === "google") {
       if (!googleId) {
         triggerError(
@@ -140,7 +142,6 @@ export default function Auth() {
         )
         return
       }
-      const redirectUri = `${window.location.origin}/auth/callback`
       const params = new URLSearchParams({
         client_id: googleId,
         redirect_uri: redirectUri,
@@ -160,7 +161,6 @@ export default function Auth() {
         )
         return
       }
-      const redirectUri = `${window.location.origin}/auth/callback`
       const params = new URLSearchParams({
         client_id: githubId,
         redirect_uri: redirectUri,
